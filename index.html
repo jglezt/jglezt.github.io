@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<!--[if lt IE 7 ]><html class="ie ie6" lang="en"><![endif]-->
+<!--[if IE 7 ]><html class="ie ie7" lang="en"><![endif]-->
+<!--[if IE 8 ]><html class="ie ie8" lang="en"><![endif]-->
+<!--[if (gte IE 9)|!(IE)]><!--><html lang="en"><!--<![endif]-->
+<head>
+    <!-- Website Template designed by www.downloadwebsitetemplates.co.uk -->
+    <!-- Modified to fit Cryogen.-->
+    <meta charset="UTF-8">
+    <title>Artificial Human Intelligence</title>
+    
+    <meta name="description" content="Welcome to my awesome blog">
+    <meta name="keywords" content="">
+    
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+    <link rel="apple-touch-icon-precomposed" sizes="144x144" href="images/ico/apple-touch-icon-144.png">
+    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="images/ico/apple-touch-icon-114.png">
+    <link rel="apple-touch-icon-precomposed" sizes="72x72" href="images/ico/apple-touch-icon-72.png">
+    <link rel="apple-touch-icon-precomposed" href="images/ico/apple-touch-icon-57.png">
+    <link rel="shortcut icon" href="images/ico/favicon.png">
+    <!--[if IE]><![endif]-->
+    <link href="/css/buttons.css" rel="stylesheet" type="text/css" />
+    <link href="/css/menu.css" rel="stylesheet" type="text/css" />
+    <link href="/css/reset.css" rel="stylesheet" type="text/css" />
+    <link href="/css/style.css" rel="stylesheet" type="text/css" />
+    <link href="/css/typography.css" rel="stylesheet" type="text/css" />
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.7.0/styles/tomorrow-night-eighties.min.css">
+    <!--[if lt IE 9]><script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+</head>
+<body>
+
+<div id="left">
+
+    <p id="logo">
+        <a title="Artificial Human Intelligence" href="/">
+            <!-- <span class="fa fa-rocket"></span> -->
+            <span class="text">Artificial Human Intelligence</span>
+        </a>
+    </p>
+
+    <div id="menucont" class="bodycontainer clearfix">
+        <div class="menutitle">
+            <p><span class="fa fa-reorder"></span><strong>Menu</strong></p>
+        </div>
+        <ul class="menu">
+            <li  class="active" ><a title="Home" href="/">Home</a></li>
+            <li ><a title="Archives" href="/archives/">Archives</a></li>
+            
+            <li ><a title="Tags" href="/tags/">Tags</a></li>
+            
+            
+            <li >
+                <a href="/pages-output/about/">About</a>
+            </li>
+            
+            <li><a title="RSS" href="/feed.xml">RSS</a></li>
+        </ul>
+    </div>
+
+    <div id="socialmedia" class="clearfix">
+        <ul>
+            <li><a title="GitHub" href="https://github.com/jglezt" rel="external"><span class="fa fa-github"></span></a></li>
+            <!-- <li><a title="Stack Overflow" href="./" rel="external"><span class="fa fa-stack-overflow"></span></a></li> -->
+            <!-- <li><a title="Google+" href="./" rel="external"><span class="fa fa-google-plus"></span></a></li> -->
+            <!-- <li><a title="LinkedIn" href="./" rel="external"><span class="fa fa-linkedin"></span></a></li> -->
+            <!-- <li><a title="Last.fm" href="./" rel="external"><span class="fa fa-lastfm"></span></a></li> -->
+        </ul>
+    </div>
+
+</div>
+
+<div id="right" class="clearfix">
+    
+<div id="post">
+    <div class="post-header">
+    <div id="post-meta" class="row">
+        <strong>October 22, 2020</strong>
+        
+        <span class="col-lg-6 right">By: Javier Antonio Gonzalez-Trejo</span>
+        
+    </div>
+    <h1>GRAD-CAM</h1>
+</div>
+<div>
+    <ol class="toc"><li><a href="#loading-everything-needed">Loading Everything needed</a></li><ol><li><a href="#xception">Xception</a></li><li><a href="#efficientnetn0">EfficientNetN0</a></li><li><a href="#vgg19">VGG19</a></li></ol><li><a href="#generate-grad-cam">Generate Grad-CAM</a></li><li><a href="#get-valid-layers-from-the-network">Get valid layers from the network</a></li><li><a href="#testing-grad-cam">Testing Grad CAM</a></li><ol><li><a href="#testing-efficientnet">Testing EfficientNet</a></li></ol><li><a href="#semantic-segmentation">Semantic segmentation.</a></li><li><a href="#conclusions">Conclusions</a></li></ol>
+    <p>Author: Javier Antonio Gonzalez Trejo
+Code to generate the Grad-CAM from a single Conv Layer <a href="http://personal.cimat.mx:8181/~mrivera/cursos/aprendizaje_profundo/GradCAM/GradCAM.html">here</a>
+The porpuse of this homework is to achive the following two objectives:</p><ol><li>Sum the Grad cams of all the convolutional layers from the indicated one.</li><li>Indicate the class from which the grad cam will be calculated.</li></ol><h2 id="loading-everything-needed">Loading Everything needed</h2><pre><code class="python">import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from skimage.transform import resize
+from PIL import Image
+
+import tensorflow as tf
+import tensorflow.keras as keras
+
+from typing import Dict, Tuple, Sequence
+</code></pre><pre><code class="python">local_image=False
+if local_image:
+    filenames=['african_elephant.png', 'autonomous_mex.png', 'beisbol.png', 'horses.png','rojas_at_angel.png', 'metro.png', 'rx_quico.png']
+    filename=filenames[0]
+else:
+    from PIL import Image
+    from urllib.request import urlopen
+    url = 'https://i.pinimg.com/originals/2f/cf/d8/2fcfd89250f0774daae19e65346b2706.jpg'
+    
+    #url = 'https://s3fs.bestfriends.org/s3fs-public/Introduce-cat-dog-Cappuccino-6654sak.jpg'
+    filename = urlopen(url)
+
+print(filename)
+</code></pre><pre><code>&lt;http.client.HTTPResponse object at 0x7fd9db34d910&gt;
+</code></pre><pre><code class="python">nombres_modelos= ['xception', 'vgg16', 'efficientnet']
+seleccion=nombres_modelos[0]
+</code></pre><h3 id="xception">Xception</h3><pre><code class="python">seleccion = nombres_modelos[0]
+if seleccion == nombres_modelos[0]:
+    from tensorflow.keras.applications import Xception
+
+    scale    =  255
+    img_size = (299,299,3)
+
+    model = Xception(input_shape = img_size,
+                     include_top = True,
+                     weights     = 'imagenet')
+
+    preprocess_input   = keras.applications.xception.preprocess_input
+    decode_predictions = keras.applications.xception.decode_predictions
+
+    last_conv_layer_name   = "block14_sepconv2_act"
+    classifier_layer_names = ["avg_pool", "predictions",]
+
+    #model.summary()
+
+    #dot_img_file = '/tmp/model_1.png'
+    #tf.keras.utils.plot_model(model, to_file=dot_img_file, show_shapes=True)
+</code></pre><h3 id="efficientnetn0">EfficientNetN0</h3><pre><code class="python">seleccion = nombres_modelos[2]
+if seleccion == nombres_modelos[2]:
+
+    import tensorflow.keras as keras
+    import efficientnet.tfkeras as efn 
+    scale=255
+    img_size = (224,224)
+    model = efn.EfficientNetB0(weights='imagenet') 
+    
+    last_conv_layer_name   = 'top_activation'
+    classifier_layer_names =  ['avg_pool', 'top_dropout', 'probs']
+
+    #model.summary()
+    #dot_img_file = '/tmp/model_1.png'
+    #tf.keras.utils.plot_model(model, to_file=dot_img_file, show_shapes=True)
+</code></pre><h3 id="vgg19">VGG19</h3><pre><code class="python">seleccion = nombres_modelos[1]
+if seleccion == nombres_modelos[1]:
+
+    from tensorflow.keras.applications import VGG16
+
+    scale=1
+    img_size  = (224,224,3)
+
+    model = VGG16(input_shape = img_size,
+                  include_top = True,
+                  weights     = 'imagenet')
+
+    preprocess_input   = keras.applications.vgg16.preprocess_input
+    decode_predictions = keras.applications.vgg16.decode_predictions
+
+    last_conv_layer_name   = 'block5_conv3'
+    classifier_layer_names =  ['block5_pool', 'flatten', 'fc1', 'fc2',"predictions",]
+
+    #model.summary()
+</code></pre><h2 id="generate-grad-cam">Generate Grad-CAM</h2><p>For only one rectified layer and for the class with the ighest probability</p><pre><code class="python">def get_img_array(img_path, img_size):
+    
+    img = Image.open(img_path)
+    
+    img = img.resize(size=img_size)
+    print(f'format: {img.format}, shape: {img.size}, mode: {img.mode}')
+    img_array = np.array(img).astype('float32')[:,:,:3]  # tiramos el canal alpha
+    img_array = np.expand_dims(img_array, axis=0)
+    return img, img_array
+</code></pre><pre><code class="python"># load and show an image with Pillow
+#'african_elephant.png',
+img,img_array =  get_img_array(img_path = filename,    
+                               img_size = img_size[:2])
+
+img_array = img_array/scale
+plt.imshow(img)
+plt.axis('off')
+plt.show()
+</code></pre><pre><code>format: None, shape: (299, 299), mode: RGB
+</code></pre><p><img src="/img/grad_cam_13_1.png" alt="png" /></p><h2 id="get-valid-layers-from-the-network">Get valid layers from the network</h2><p>As first step, we need to obtain all the rectified Conv2D layers from which the Grad-CAM will be calculated.
+In the case for Xception and all the architectures that use skip connections, the rectified conv2d from which we calculate the Grad-CAM should not have an alternative path.</p><pre><code class="python"># Imprimir las predicciones mas altas, seleccionaremos la más alta
+K = 10
+preds = model.predict(img_array)
+preds_index = tf.math.top_k(preds[0], K)[1]
+
+decoded_predictions = decode_predictions(preds, top=K)[0]
+
+print("{:10} {:20} {:10} {:5}".format('Id. clase', 'Nombre', 'Probabilidad',
+                                      'Indice'))
+print(27*' -')
+for i, decoded in enumerate(decoded_predictions):
+    print("{:10s} {:25s} {:0.5} {:7}".format(decoded[0], decoded[1], decoded[2], preds_index[i]))
+top_pred_index = tf.argmax(preds[0])
+</code></pre><pre><code>Id. clase  Nombre               Probabilidad Indice
+ - - - - - - - - - - - - - - - - - - - - - - - - - - -
+n02110958  pug                       0.40516     254
+n02108915  French_bulldog            0.15871     245
+n02108422  bull_mastiff              0.025704     243
+n02112137  chow                      0.0076207     260
+n04204347  shopping_cart             0.007052     791
+n03444034  go-kart                   0.0064967     573
+n02112706  Brabancon_griffon         0.006338     262
+n03445924  golfcart                  0.0046578     575
+n02086079  Pekinese                  0.0041155     154
+n03649909  lawn_mower                0.003134     621
+</code></pre><pre><code class="python">def make_gradcam_heatmap(img_array, model, last_conv_layer_name, classifier_layer_names, preds):
+    
+    # Modelo que mapea la imagen de entrada a la capa convolucional última,
+    # donde se calculará la activación
+    last_conv_layer  = model.get_layer(last_conv_layer_name)
+    conv_model       = keras.Model(model.inputs, last_conv_layer.output)
+
+    # Modelo que mapea las activaciones a la salida final
+    classifier_input = keras.Input(shape=last_conv_layer.output.shape[1:])
+    x = classifier_input
+    for layer_name in classifier_layer_names:
+        x = model.get_layer(layer_name)(x)
+    classifier_model = keras.Model(classifier_input, x)
+    
+    # Cálculo del gradiente la salida  del modelo clasificador respecto a     
+    with tf.GradientTape() as tape:
+        
+        # Calcula activacion del modelo base convolucional
+        last_conv_layer_output = conv_model(img_array)
+        tape.watch(last_conv_layer_output)
+        
+        # Calcula la predicción con modelo clasificador, para la clase mas probable
+        preds = classifier_model(last_conv_layer_output)
+        top_pred_index = tf.argmax(preds[0])
+        print(top_pred_index)
+        top_class_channel = preds[:, top_pred_index]
+
+    # Obtenemos el gradiente en la capa final clasificadora con respecto a
+    # la salida del modelo base convolucional
+    grads = tape.gradient(top_class_channel, last_conv_layer_output)
+
+    # Vector de pesos: medias del gradiente por capas,
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+    
+    # salida de la última capa convolucional
+    last_conv_layer_output = last_conv_layer_output.numpy()[0]
+    
+    # saliencia es la respuesta promedio de la última capa convolucional
+    saliency = np.mean(last_conv_layer_output, axis=-1)
+    saliency = np.maximum(saliency, 0) / np.max(saliency)
+    
+    # Multiplicación de cada canal por el vector de pesos
+    pooled_grads = pooled_grads.numpy()
+    for i in range(pooled_grads.shape[-1]):
+        last_conv_layer_output[:, :, i] *= pooled_grads[i]
+        
+    # Heatmap: promedio de cada canal por su peso
+    grad_cam = np.mean(last_conv_layer_output, axis=-1)
+    grad_cam = np.maximum(grad_cam, 0) / np.max(grad_cam)
+    
+    return grad_cam, saliency
+</code></pre><pre><code class="python"># Generate class activation heatmap
+grad_cam, saliency = make_gradcam_heatmap(img_array, 
+                                          model, 
+                                          last_conv_layer_name, 
+                                          classifier_layer_names,
+                                          preds)
+
+</code></pre><pre><code>tf.Tensor(254, shape=(), dtype=int64)
+</code></pre><pre><code class="python">def show_hotmap (img, heatmap, title='Heatmap', alpha=0.6, cmap='jet', axisOnOff='off'):
+    '''
+    img     :    Image
+    heatmap :    2d narray
+    '''
+    resized_heatmap=resize(heatmap, img.size)
+    
+    fig, ax = plt.subplots()
+    ax.imshow(img)
+    ax.imshow(resized_heatmap, alpha=alpha, cmap=cmap)
+    plt.axis(axisOnOff)
+    plt.title(title)
+    plt.show()
+</code></pre><pre><code class="python">show_hotmap(img=img, heatmap=grad_cam, title=f'Grad Cam: {model.name}')
+</code></pre><p><img src="/img/grad_cam_19_0.png" alt="png" /></p><pre><code class="python">## Homework function
+import re
+from collections import OrderedDict
+from tensorflow.keras.layers import Conv2D, SeparableConv2D, DepthwiseConv2D, Conv2DTranspose, Activation
+from tensorflow.keras.activations import linear
+
+class GradCAM():
+    def __init__(self, model: tf.python.keras.engine.functional.Functional,
+                 img_size: Tuple[int, int],
+                 decode_predictions, scale: int) -&gt; None:
+        self.model = model
+        self.img_size = img_size
+        self.scale = scale
+        # Only needed for visualization
+        self.decode_predictions = decode_predictions
+
+        self.layers = self.__get_layers()
+        self.valid_layers = self.__get_valid_layers()
+
+    def set_img(self, img: str) -&gt; None:
+        """Sets the image variables and obtains the top 10 classes
+        found
+
+        Parameters:
+        img: Contains the route to the image.
+
+        Returns:
+        None"""
+        self.img, self.img_array = self.__get_img_array(img)
+        # Normally scale has value of 1 or 255.
+        # Used to set the values of the pixels between
+        # 0 and 1 if the model requires it
+        self.img_array = self.img_array/self.scale
+        K = 10
+        preds = self.model.predict(self.img_array)
+        self.preds_index = tf.math.top_k(preds[0], K)[1]
+        # Just to indicate the possible classes that the GradCAM uses
+        self.decoded_predictions = self.decode_predictions(preds, top=K)[0]
+
+    def __get_img_array(self, img_path: str) -&gt; None:
+        """Resizes the image to the model input size
+
+        Parameters:
+        img_path: Contains the route to the image.
+
+        Returns:
+        None"""
+        img = Image.open(img_path)
+
+        img = img.resize(size=self.img_size)
+        print(f'format: {img.format}, shape: {img.size}, mode: {img.mode}')
+        img_array = np.array(img).astype('float32')[:,:,:3]  # tiramos el canal alpha
+        img_array = np.expand_dims(img_array, axis=0)
+        return img, img_array
+
+    def set_class(self, class_name: str) -&gt; None:
+        try:
+            self.class_index = self.__validate_class(class_name)
+        except Exception:
+            print("Not a valid class name, try this:")
+            self.print_valid_classes()
+
+    def __validate_class(self, class_name: str) -&gt; int:
+        """Validates if the class_name is in the top 10 classes found
+        in the image
+
+        Parameters:
+        class_name:
+
+        Returns:
+        int: The index of the class."""
+        for i, decoded in enumerate(self.decoded_predictions):
+            if decoded[1] == class_name:
+                return self.preds_index[i]
+        raise Exception
+
+    def print_valid_classes(self) -&gt; None:
+        """Prints the classes found in the image. Public to be
+        used before setting the class"""
+        print("{:10} {:20} {:10} {:5}".format('Id. clase', 'Nombre',
+                                              'Probabilidad',
+                                              'Indice'))
+        print(27*' -')
+        for i, decoded in enumerate(self.decoded_predictions):
+            print("{:10s} {:25s} {:0.5} {:7}".format(decoded[0],
+                                                     decoded[1],
+                                                     decoded[2],
+                                                     self.preds_index[i]))
+
+    def __get_layers(self) -&gt; Dict:
+        """Returns the layers with their corresponding input and output layers.
+        1. Know from which layers a layer takes as input or output.
+        2. Know where an skip connection starts and ends.
+
+        Returns:
+        Dict: Contains the layers with all the output and input
+        layers connected to them."""
+        separator = '[^(\/|:)]*'
+        layers =  OrderedDict()
+        # Not add a reference to itself.
+        layers[model.layers[0].name] = {'out': [],
+                                        'in' : [], # Not going to be processed
+                                        'type': self.model.layers[0],}
+        for layer in self.model.layers[1:]:
+            # The layer might contain more than 1 input layer
+            if type(layer.input) == list:
+                layers[layer.name] = {'out': [],
+                                      'in' : [re.search(separator,
+                                                        input_l.name)[0]
+                                              for input_l in layer.input],
+                                      'type': layer}
+                for layer_input in layer.input:
+                    layers[re.search(separator, layer_input.name)[0]]['out']\
+                        .append(layer.name)
+            else:
+                layers[layer.name] = {'out': [],
+                                      'in' : [re.search(separator,
+                                                        layer.input.name)[0]],
+                                      'type': layer}
+                layers[re.search(separator, layer.input.name)[0]]['out']\
+                    .append(layer.name)
+
+        return layers
+
+    def __get_valid_layers(self) -&gt; Sequence[str]:
+        """Obtains a list of valid layers. Needed since Conv2D and
+        Sequential Layers can not be used if inside a skip connection.
+
+        Returns:
+        Sequential: List with all the valid layers"""
+        # Takes into account multiple skip connections
+        skip_tag = 0
+        valid_layers = []
+        for name, value in self.layers.items():
+            # Skip layer ends
+            if len(value["in"]) &gt; 1:
+                skip_tag -= 1
+            if skip_tag &lt;= 0 and (((type(value["type"]) \
+                                    in [Conv2D, SeparableConv2D,
+                                        DepthwiseConv2D,
+                                        Conv2DTranspose])
+                                   and value["type"].activation != linear)
+                                  or type(value["type"]) == Activation):
+                valid_layers.append(name)
+            # Skip layer starts
+            if len(value["out"]) &gt; 1:
+                skip_tag += 1
+
+        return valid_layers
+
+    def set_last_conv_layer(self, layer_name: str) -&gt; None:
+        """Creates a list with all the valid layers after the
+        `layer_name`
+
+        Parameters:
+        layer_name:
+
+        Returns:
+        None"""
+        try:
+            self.last_conv_layer_list =\
+                self.__validate_last_conv_layer(layer_name)
+            self.classifier_layer_names =\
+                self.__get_classifier_layers_name_list()
+        except Exception:
+            self.print_valid_layers()
+
+    def print_valid_layers(self) -&gt; None:
+        print("Not a valid layer, try on the following: \n {}"
+                  .format(self.valid_layers))
+
+    def __validate_last_conv_layer(self, layer_name :str) -&gt; None:
+        """Make sure the layer is inside the valid layers AKA not
+        inside an skip connection.
+
+        Parameters:
+        layer_name:
+
+        Returns:
+        None"""
+
+        if not layer_name in self.valid_layers:
+            raise Exception
+        return self.valid_layers[self.valid_layers.index(layer_name):]
+
+    def __get_classifier_layers_name_list(self) -&gt; Sequence[Sequence[str]]:
+        """Obtains all the layers after each layer in
+        self.last_conv_layer_list. Needed to create temporary models.
+
+        Returns:
+        Sequence[Sequence[str]]: Each list at the same index of the related
+        last_layer"""
+        layers_name = list(self.layers.keys())
+        classifier_layer_names = []
+        for layer in self.last_conv_layer_list:
+            classifier_layer_names.append(layers_name[layers_name.index(layer)
+                                                      + 1:])
+        return classifier_layer_names
+
+    def generate_summed_grad_cam(self):
+        """Sum all the Grad CAMs obtained. Obtaining a heat map containing
+        (hopefully) all the features in the image.
+
+        Returns:
+        np.array: """
+        grad_cam = np.zeros(self.img.size)
+
+        for i, last_conv_layer_name in enumerate(self.last_conv_layer_list):
+            grad_cam += resize(self.make_gradcam_heatmap(
+                last_conv_layer_name,
+                self.classifier_layer_names[i]),
+                               self.img.size)
+            # Whithout this, the GradCAM do not add in the image.
+            np.putmask(grad_cam, grad_cam &gt;= 1, 1)
+        return grad_cam
+
+    def generate_last_layer_grad_cam(self):
+        """Generate only the first Grad CAM. Only for comparision.
+        Returns
+        np.array:
+        """
+        return self.make_gradcam_heatmap(self.last_conv_layer_list[0],
+                                         self.classifier_layer_names[0])
+
+    def make_gradcam_heatmap(self, last_conv_layer_name, classifier_layer_names):
+    
+    # Modelo que mapea la imagen de entrada a la capa convolucional última,
+    # donde se calculará la activación
+        last_conv_layer  = self.model.get_layer(last_conv_layer_name)
+        conv_model  = keras.Model(self.model.inputs,
+                                            last_conv_layer.output)
+
+        # Self.Modelo que mapea las activaciones a la salida final
+        classifier_input = keras.Input(shape=last_conv_layer.output.shape[1:])
+        # Have a reference of all the layers if a skip connetion needs them.
+        x =  {last_conv_layer_name: classifier_input}
+
+        for layer_name in classifier_layer_names:
+            temp_input = [x[in_layer]
+                          for in_layer in self.layers[layer_name]["in"]]
+            if len(temp_input) == 1:
+                x[layer_name] = self.model.get_layer(layer_name)(temp_input[0])
+            else:
+                x[layer_name] = self.model.get_layer(layer_name)(temp_input)
+            final_input = x[layer_name]
+        classifier_model = keras.Model(classifier_input, final_input)
+
+        # Cálculo del gradiente la salida del modelo clasificador respecto a
+        with tf.GradientTape() as tape:
+        
+            # Calcula activacion del self.modelo base convolucional
+            last_conv_layer_output = conv_model(self.img_array)
+            tape.watch(last_conv_layer_output)
+            
+            # Calcula la predicción con modelo clasificador,
+            # para la clase mas probable
+            preds = classifier_model(last_conv_layer_output)
+            top_class_channel = preds[:, self.class_index]
+
+        # Obtenemos el gradiente en la capa final clasificadora con respecto a
+        # la salida del self.modelo base convolucional
+        grads = tape.gradient(top_class_channel, last_conv_layer_output)
+
+        # Vector de pesos: medias del gradiente por capas,
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+    
+        # salida de la última capa convolucional
+        last_conv_layer_output = last_conv_layer_output.numpy()[0]
+    
+        # Multiplicación de cada canal por el vector de pesos
+        pooled_grads = pooled_grads.numpy()
+        for i in range(pooled_grads.shape[-1]):
+            last_conv_layer_output[:, :, i] *= pooled_grads[i]
+        
+        # Heatmap: promedio de cada canal por su peso
+        grad_cam = np.mean(last_conv_layer_output, axis=-1)
+        grad_cam = np.maximum(grad_cam, 0) / np.max(grad_cam)
+    
+        return grad_cam
+
+    def show_hotmap (self, img, heatmap, alpha=0.6, cmap='jet', axisOnOff='off'):
+        '''
+        img     :    Image
+        heatmap :    2d narray
+        '''
+        resized_heatmap=resize(heatmap, img.size)
+
+        fig, ax = plt.subplots()
+        ax.imshow(img)
+        ax.imshow(resized_heatmap, alpha=alpha, cmap=cmap)
+        plt.axis(axisOnOff)
+        plt.title(self.model.name)
+        plt.show()
+</code></pre><p>This is the order from which the GradCAM should be called</p><pre><code class="python">grad_cam = GradCAM(model, img_size[:2], decode_predictions,
+                   scale)
+grad_cam.valid_layers
+grad_cam.set_img("cat_dog.jpg")
+grad_cam.set_class("bluetick")
+grad_cam.set_last_conv_layer("block14_sepconv2_act")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><pre><code>format: None, shape: (299, 299), mode: RGB
+</code></pre><p><img src="/img/grad_cam_22_1.png" alt="png" /></p><p><img src="/img/grad_cam_22_2.png" alt="png" /></p><p>If one does not know the valid classes or layers, it is possible to use the following methods.</p><pre><code class="python">grad_cam.print_valid_classes()
+grad_cam.print_valid_layers()
+</code></pre><pre><code>Id. clase  Nombre               Probabilidad Indice
+ - - - - - - - - - - - - - - - - - - - - - - - - - - -
+n02093256  Staffordshire_bullterrier 0.059712     179
+n02093428  American_Staffordshire_terrier 0.059568     180
+n02091467  Norwegian_elkhound        0.038989     174
+n04265275  space_heater              0.033706     811
+n02099712  Labrador_retriever        0.024473     208
+n02110806  basenji                   0.015478     253
+n02087046  toy_terrier               0.013755     158
+n03223299  doormat                   0.013685     539
+n04409515  tennis_ball               0.013643     852
+n02088632  bluetick                  0.013467     164
+Not a valid layer, try on the following: 
+ ['block1_conv1_act', 'block1_conv2_act', 'block14_sepconv1_act', 'block14_sepconv2_act']
+</code></pre><h2 id="testing-grad-cam">Testing Grad CAM</h2><p>First, we go back to initialize in the Xception model, then we initialize our GradCam class</p><pre><code class="python">grad_cam = GradCAM(model, img_size[:2], decode_predictions,
+                   scale)
+grad_cam.set_img("enfermera.jpg")
+</code></pre><pre><code>format: None, shape: (299, 299), mode: RGB
+</code></pre><pre><code class="python"># Find the class found by the model
+grad_cam.print_valid_classes()
+grad_cam.print_valid_layers()
+</code></pre><pre><code>Id. clase  Nombre               Probabilidad Indice
+ - - - - - - - - - - - - - - - - - - - - - - - - - - -
+n03630383  lab_coat                  0.83788     617
+n04317175  stethoscope               0.096154     823
+n03877472  pajama                    0.011252     697
+n03868863  oxygen_mask               0.005809     691
+n03594734  jean                      0.0025902     608
+n04479046  trench_coat               0.0024705     869
+n03814639  neck_brace                0.0017962     678
+n04376876  syringe                   0.0011005     845
+n04350905  suit                      0.0010896     834
+n02815834  beaker                    0.00090065     438
+Not a valid layer, try on the following: 
+ ['block1_conv1_act', 'block1_conv2_act', 'block14_sepconv1_act', 'block14_sepconv2_act']
+</code></pre><p>It not detected the nurse but the objects around her. An interisting class is the pajama, lets see which features did the model capture to belive that a pajama is in the image.</p><pre><code class="python">grad_cam.set_class("pajama")
+grad_cam.set_last_conv_layer("block14_sepconv1_act")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_29_0.png" alt="png" /></p><p><img src="/img/grad_cam_29_1.png" alt="png" /></p><p>Extraneously, it has a heavy focus on the person face while capturing part of the background. This behavior migth be expected by looking at the percentage that the class has. The wird thing is it did not look in the nurse clothing.
+Next, we look into the stethoscope class.</p><pre><code class="python">grad_cam.set_class("stethoscope")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_31_0.png" alt="png" /></p><p><img src="/img/grad_cam_31_1.png" alt="png" /></p><p>We can see that it focus heavly in the form in the neck of the nurse and a little bit in the parts from which separates the stethoscope from a simple rope.
+Now, we will try to use all the valid layer to see if the Grad-CAM finds more important features.</p><pre><code class="python">grad_cam.set_last_conv_layer("block1_conv1_act")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_33_0.png" alt="png" /></p><p><img src="/img/grad_cam_33_1.png" alt="png" /></p><p>Here we find that the model tries to find elongated objects as well as the neck of the nurse. It did find more features, but it also show all the objects that at first glance (at least for the model) migth be a stethoscope.
+Finally for this image, we will take a look into the lab_coat class.</p><pre><code class="python">grad_cam.set_class("lab_coat")
+grad_cam.set_last_conv_layer("block14_sepconv1_act")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_35_0.png" alt="png" /></p><p><img src="/img/grad_cam_35_1.png" alt="png" /></p><p>As expected, it takes into account the coat itself, while also looking into the patient blanket.</p><h3 id="testing-efficientnet">Testing EfficientNet</h3><p>Now, we will take a look into an stethoscope with a rope knot using the EfficientNet architecture.</p><pre><code class="python">grad_cam = GradCAM(model, img_size[:2], decode_predictions,
+                   scale)
+grad_cam.valid_layers
+grad_cam.set_img("stetoscope.jpg")
+</code></pre><pre><code>format: None, shape: (224, 224), mode: RGB
+</code></pre><pre><code class="python">grad_cam.print_valid_classes()
+grad_cam.print_valid_layers()
+</code></pre><pre><code>Id. clase  Nombre               Probabilidad Indice
+ - - - - - - - - - - - - - - - - - - - - - - - - - - -
+n03532672  hook                      0.22274     600
+n04317175  stethoscope               0.08254     823
+n03868863  oxygen_mask               0.059316     691
+n04579432  whistle                   0.043543     902
+n03692522  loupe                     0.02845     633
+n02865351  bolo_tie                  0.024323     451
+n03627232  knot                      0.023362     616
+n03759954  microphone                0.021103     650
+n04141975  scale                     0.01421     778
+n03706229  magnetic_compass          0.011366     635
+Not a valid layer, try on the following: 
+ ['stem_activation', 'block1a_activation', 'block2a_expand_activation', 'block2a_activation', 'block3a_expand_activation', 'block3a_activation', 'block4a_expand_activation', 'block4a_activation', 'block5a_expand_activation', 'block5a_activation', 'block6a_expand_activation', 'block6a_activation', 'block7a_expand_activation', 'block7a_activation', 'top_activation']
+</code></pre><p>Here we see that it detected the stethoscope after detecting it by hook, lets see the captured features.</p><pre><code class="python">grad_cam.set_class("hook")
+grad_cam.set_last_conv_layer("stem_activation")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_41_0.png" alt="png" /></p><p><img src="/img/grad_cam_41_1.png" alt="png" /></p><p>At this layer, practically uses everything in the image, lets use the last last layer.</p><pre><code class="python">grad_cam.set_last_conv_layer("top_activation")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_43_0.png" alt="png" /></p><p><img src="/img/grad_cam_43_1.png" alt="png" /></p><p>At this layer, the model focuses in the curvature of the stetoscope to belive that this is a hook.
+Now we will focus in the actual class.</p><pre><code class="python">grad_cam.set_class("stethoscope")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_45_0.png" alt="png" /></p><p><img src="/img/grad_cam_45_1.png" alt="png" /></p><p>Here, we see that the actual parts that are distinguish the sethoscope are used.</p><h2 id="semantic-segmentation">Semantic segmentation.</h2><p>Now we will try to fin the number of valid layers that are needed to segmentate a class in a image. For that we will use a Lion and hiena image.</p><pre><code class="python">grad_cam = GradCAM(model, img_size[:2], decode_predictions,
+                   scale)
+grad_cam.valid_layers
+grad_cam.set_img("hienas_lions.jpg")
+grad_cam.print_valid_classes()
+</code></pre><pre><code>format: None, shape: (224, 224), mode: RGB
+Id. clase  Nombre               Probabilidad Indice
+ - - - - - - - - - - - - - - - - - - - - - - - - - - -
+n02129165  lion                      0.82089     291
+n02115913  dhole                     0.028735     274
+n02112137  chow                      0.015349     260
+n02114712  red_wolf                  0.0091723     271
+n02090721  Irish_wolfhound           0.0074853     170
+n02437312  Arabian_camel             0.0071261     354
+n02094258  Norwich_terrier           0.0064124     186
+n02114548  white_wolf                0.00549     270
+n02105251  briard                    0.0030497     226
+n02115641  dingo                     0.0030489     273
+</code></pre><p>The hiene was detected as a dhole, therefor we will use the lion.</p><pre><code class="python">grad_cam.set_class("lion")
+grad_cam.set_last_conv_layer("block6a_expand_activation")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_50_0.png" alt="png" /></p><p><img src="/img/grad_cam_50_1.png" alt="png" /></p><pre><code class="python"># Now we move to a lower layer, since the lion is correctly segmented but other features are also detected.
+grad_cam.set_last_conv_layer("block7a_expand_activation")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_51_0.png" alt="png" /></p><p><img src="/img/grad_cam_51_1.png" alt="png" /></p><p>At this level we found that the lion segmented whitout to much noise. Now we will look into the next class with the same layer to se if that is an ideal layer to segmentate.</p><pre><code class="python">grad_cam.set_class("dhole")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_53_0.png" alt="png" /></p><p><img src="/img/grad_cam_53_1.png" alt="png" /></p><p>We see that only the head is detected leaving prt of the body, therefore will we use a superior layer.</p><pre><code class="python">grad_cam.set_last_conv_layer("block6a_expand_activation")
+grad_cam_heat_map = grad_cam.generate_summed_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+grad_cam_heat_map = grad_cam.generate_last_layer_grad_cam()
+grad_cam.show_hotmap(grad_cam.img, grad_cam_heat_map)
+</code></pre><p><img src="/img/grad_cam_55_0.png" alt="png" /></p><p><img src="/img/grad_cam_55_1.png" alt="png" /></p><p>Whitout luck, the Hiena was not segmented even by superior layers.</p><h2 id="conclusions">Conclusions</h2><ol><li>Grad CAM can be used to image segmentation, and also the sum of different grad cams can help to obtain to capture the whole class found in an image. The following observations were found.
+<ol><li>The layers should be near the last layer of the architecture, since we want to find semantic information which is detected by the deeper layers.</li><li>The optimal valid layers seems to rely on the class percentage.</li></ol></li><li>Is not possible to use Conv2D and activations inside an skip path, by the form the temporary model is built. More testing in pytorch is needed since in that framework is possible to access the gradients without the need of alternative
+models.</li></ol>
+</div>
+
+<div id="post-tags">
+    <br/> 
+    <b>Tags: </b>
+    
+    <a href="/tags-output/object detection/">object detection</a>
+    
+    <a href="/tags-output/deep learning/">deep learning</a>
+    
+    <a href="/tags-output/tensorflow/">tensorflow</a>
+    
+    <a href="/tags-output/object localization/">object localization</a>
+    
+</div>
+
+<br/>
+
+    
+
+    <div id="prev-next">
+        
+        
+    </div>
+</div>
+
+<hr/>
+<div id="footercont" class="clearfix">Copyright &copy; 2020 Javier Antonio Gonzalez-Trejo
+    <p>Powered by <a href="http://cryogenweb.org">Cryogen</a> | Free Website Template by <a title="free website templates" href="http://www.downloadwebsitetemplates.co.uk" rel="external">Download Website Templates</a></p>
+
+</div>
+</div>
+<script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+<script src="/js/highlight.pack.js" type="application/javascript"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<script src="/js/scripts.js" type="application/javascript"></script>
+
+
+</body>
+</html>
