@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>Forward, Loss, Backward, Step: Tensorflow implementation of the Conditional GAN</title>
+    
+<meta name="keywords" content="nlp,deep learning,gru,attention,tensorflow,GAN,object detection,object localization">
+
+<meta name="description" content="Original Paper Conditional Generative Adversarial NetsDCGAN Code from PhD Mariano Rivera">
+
+<meta property="og:description" content="Original Paper Conditional Generative Adversarial NetsDCGAN Code from PhD Mariano Rivera">
+
+<meta property="og:url" content="https://jglezt.github.io/posts-output/2020-12-29-cgan/" />
+<meta property="og:title" content="Tensorflow implementation of the Conditional GAN" />
+<meta property="og:type" content="article" />
+
+    <link rel="canonical" href="https://jglezt.github.io/posts-output/2020-12-29-cgan/">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="//fonts.googleapis.com/css?family=Alegreya:400italic,700italic,400,700" rel="stylesheet"
+          type="text/css">
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap.min.css">
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.7.0/styles/default.min.css">
+    <link href="/css/screen.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+
+
+<nav class="navbar navbar-default">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="/">Forward, Loss, Backward, Step</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav navbar-right">
+                <li ><a href="/">Home</a></li>
+                <li
+                ><a href="/archives/">Archives</a></li>
+                
+                <li
+                >
+                <a href="/pages-output/about/">About</a>
+                </li>
+                
+                <li><a href="/feed.xml">RSS</a></li>
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+                        More <span class="caret"></span></a>
+                    <ul class="dropdown-menu" role="menu">
+                        <li class="dropdown-header">Links</li>
+                        <!-- <li><a href="http://cryogenweb.org/docs/home.html">Cryogen Docs</a></li> -->
+                        <!-- <li><a href="https://carmen.la/blog/archives/">Carmen's Blog</a></li> -->
+                        
+                        <li><a href="/pages-output/another-page/">Another Page</a></li>
+                        
+
+                        
+                        <li class="divider"></li>
+                        <li class="dropdown-header">Recent Posts</li>
+                        
+                        <li><a href="/posts-output/2020-12-16-chatbot/">Spanish Chat Bot using GRU&#39;s with attention</a></li>
+                        
+                        <li><a href="/posts-output/2020-12-13-attention/">Analysis of attention mechanism in the task of Machine translation</a></li>
+                        
+                        <li><a href="/posts-output/2020-12-29-cgan/">Tensorflow implementation of the Conditional GAN</a></li>
+                        
+                        
+
+                        
+                        <li class="divider"></li>
+                        <li class="dropdown-header">Tags</li>
+                        
+                        <li><a href="/tags-output/nlp/">nlp</a></li>
+                        
+                        <li><a href="/tags-output/deep learning/">deep learning</a></li>
+                        
+                        <li><a href="/tags-output/gru/">gru</a></li>
+                        
+                        <li><a href="/tags-output/attention/">attention</a></li>
+                        
+                        <li><a href="/tags-output/tensorflow/">tensorflow</a></li>
+                        
+                        <li><a href="/tags-output/GAN/">GAN</a></li>
+                        
+                        <li><a href="/tags-output/object detection/">object detection</a></li>
+                        
+                        <li><a href="/tags-output/object localization/">object localization</a></li>
+                        
+                        
+                    </ul>
+                </li>
+            </ul>
+        </div><!--/.nav-collapse -->
+    </div><!--/.container-fluid -->
+</nav>
+
+
+<div class="container">
+
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div id="content">
+                
+<div id="post">
+    <div class="post-header">
+    <div id="post-meta" class="row">
+        <div class="col-lg-6">October 29, 2020</div>
+        
+        <span class="col-lg-6 right">By: Javier Antonio Gonzalez-Trejo</span>
+        
+    </div>
+    <h2>Tensorflow implementation of the Conditional GAN</h2>
+</div>
+<div>
+    <ol class="toc"><li><a href="#original-paper-conditional-generative-adversarial-nets">Original Paper <a href="https://arxiv.org/abs/1411.1784">Conditional Generative Adversarial Nets</a></a></li><li><a href="#dcgan-code-from-phd-mariano-rivera">DCGAN Code from <a href="https://www.cimat.mx/~mrivera/cursos/aprendizaje_profundo/dcgan/dcgan.html">PhD Mariano Rivera</a></a></li><li><a href="#load-the-altunet-model">Load the AltUnet model</a></li><li><a href="#general-parameters">General parameters</a></li><li><a href="#generator">Generator</a></li><ol><li><a href="#discriminator">Discriminator</a></li><li><a href="#loss-function">Loss function</a></li><ol><li><a href="#for-discriminator">For discriminator</a></li><li><a href="#for-generator">For generator</a></li></ol><li><a href="#optimizers">Optimizers</a></li><li><a href="#training">Training</a></li><ol><li><a href="#gan-training">GAN Training</a></li></ol><li><a href="#save-models">Save models</a></li><li><a href="#results-discussion">Results discussion</a></li></ol></ol>
+    <h2 id="original-paper-conditional-generative-adversarial-nets">Original Paper <a href="https://arxiv.org/abs/1411.1784">Conditional Generative Adversarial Nets</a></h2><h2 id="dcgan-code-from-phd-mariano-rivera">DCGAN Code from <a href="https://www.cimat.mx/~mrivera/cursos/aprendizaje_profundo/dcgan/dcgan.html">PhD Mariano Rivera</a></h2><p>In this notebook, we will train a Unimodal conditional Generative Advertial Neural Network.
+In a nutshell, a conditional Generative Advertial Neural Network (GAN)is simply a GAN with an additional input $y$ for both the discriminator and the generator.
+This additional input "conditions" the output of the generator and what kind of data the discriminator is looking for.
+The objective is to have better control the modes of the data generated. This kind of control could be done using only the noise feed to the GAN without the conditioning, the problem is that it can not be for sure how this relationship beteewn the noise "z" is with respect the GAN output.</p><pre><code class="python">import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID";
+os.environ["CUDA_VISIBLE_DEVICES"]="0";
+
+import tensorflow as tf
+print(tf.__version__)
+if tf.test.gpu_device_name():
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+    print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+else:
+    print("Please install GPU version of TF")
+</code></pre><pre><code>2.3.1
+Default GPU Device: /device:GPU:0
+</code></pre><pre><code class="python">%matplotlib inline
+import sys
+import numpy as np
+import pandas as pd
+import itertools
+import matplotlib.pyplot as plt
+
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.layers import Input, Dense, Reshape, Flatten, Dropout
+from tensorflow.keras.layers import BatchNormalization, ZeroPadding2D
+from tensorflow.keras.layers import Activation, LeakyReLU, Concatenate
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose, Embedding
+import tensorflow_datasets as tfds
+
+
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.utils import plot_model
+</code></pre><pre><code class="python">def reset_weights(model):
+    '''
+    Reinicializa los pesos del modelo 
+    '''
+    for ix, layer in enumerate(model.layers):
+        if hasattr(model.layers[ix], 'kernel_initializer') and \
+                hasattr(model.layers[ix], 'bias_initializer'):
+            weight_initializer = model.layers[ix].kernel_initializer
+            bias_initializer   = model.layers[ix].bias_initializer
+
+            old_weights, old_biases = model.layers[ix].get_weights()
+
+            model.layers[ix].set_weights([
+                weight_initializer(shape=old_weights.shape),
+                bias_initializer  (shape  =len(old_biases))])
+</code></pre><h2 id="load-the-altunet-model">Load the AltUnet model</h2><p>We will convert the AltNet model from pytorch to tensorflow using the library <code>pytorch2keras</code>, but for that, we need that the memory of the GPU which is not accesible once tensorflow is making use of it.</p><h2 id="general-parameters">General parameters</h2><p>Here, we load the training examples and its labels, since they are needed to train the Conditional GAN.
+The dataset will be the clasical MNIST, which containts images of all digits hand drawn. The shape of each image is $28 \times 28 \times 1$.</p><pre><code class="python"># carga datos reales
+(X_train, y_train), (_, _) = mnist.load_data()
+
+# Rescale -1 to 1
+X_train = X_train / 127.5 - 1.
+X_train = np.expand_dims(X_train, axis=3)
+y_train = np.expand_dims(y_train, axis=1)
+</code></pre><pre><code class="python">(buffer_size,img_rows, img_cols, channels) = X_train.shape
+img_shape  = (img_rows, img_cols, channels)
+z_dim      = 20     # dimensión del espacio latente
+batch_size = 256
+num_epochs = 200
+each_save  = 5
+
+path_results = 'cdcgan_results_tensorflow/'
+</code></pre><pre><code class="python">train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train)).shuffle(buffer_size).batch(batch_size)
+train_dataset
+</code></pre><pre><code>&lt;BatchDataset shapes: ((None, 28, 28, 1), (None, 1)), types: (tf.float64, tf.uint8)&gt;
+</code></pre><h1 id="generator">Generator</h1><p>The generator $G(z | y)$ will learn the distribution $p_g$ from the dataset MNIST by mapping the input z conditioned by a label $y \in {0 \dots 9}$ using a non linear mapping function, in this case a Convolutional Neural Network $G$.</p><p>The architecture of the Generator is as follows, we have two inputs, the input comming from the Gaussian distribution of shape $20$ and the conditional input $y$ of shape $10$ from which we will indicate the generator what number to produce. The input shape is feed to a low dimensionality embedding layer to have a vector of shape $50$, then we rescalate the input to be of shape $7 \times 7 \times 1 $ in order to be concatated as an additonal channel later. The input z passes through a dense layer to be rescalated to a  shape of $7 \times 7 \times 256 $. This result is concatenated with the output of the input $y$ branch.</p><p>After that, we have the transposed convolutional layers, that reduces the dimentionality of the input while incrementing the resolution by a factor two each layer up to the shape of $28 \times 28$.</p><p>Each layer has leaky relu activation to avoid sparce gradients.</p><p>The last layer has an activation layer $tanh$ which presented very good results in the DCGAN original paper (here)[https://arxiv.org/pdf/1511.06434.pdf].</p><pre><code class="python">def build_generator(img_shape, z_dim, n_classes = 10, verbose=False):
+    '''
+    Genera una imagen de 28x28x1 a partir de un vector aleatorio de 100 entradas (espacio latente)
+    condicionado por una entrada labels, que indicara el numero a generar.
+    '''
+
+    z = Input(shape=(z_dim,))
+
+    # La entrada sera un escalar indicando el numero a generar
+    y = Input(shape=(1,))
+
+    # Utilizando las sugerencias curadas de https://github.com/soumith/ganhacks,
+    # usamos, un embedding de baja dimensionalidad.
+    Y = Embedding(n_classes, 50)(y)
+
+    # Reescalamos la salida del embedding a 7 * 7
+    Y = Dense(7 * 7, input_dim = 50)(Y)
+    Y = Reshape((7, 7, 1))(Y)
+
+    # Pasa entrada unidimensional de dimensión 20 en un tensor de (7)(7)(256) tensor via un red Densa
+    # luego la reformatea en un tensor de 7x7x128
+    X = Dense(256 * 7 * 7, input_dim=z_dim) (z)
+    X = Reshape((7, 7, 256))(X)
+
+    # Añadimos tanto la rama de z asi como y.
+    X = Concatenate()([X, Y])
+
+    # Convolución transpuesta, tensor de 7x7x257 a 14x14x128, con normalización por lote y activación ReLU
+    X = Conv2DTranspose(filters    =128, 
+                        kernel_size=3, 
+                        strides    =2, 
+                        padding    ='same')(X)
+    X = BatchNormalization()(X)
+    X = LeakyReLU(alpha=0.01)(X)
+    
+    # Convolución transpuesta, tensor de 14x14x128, a 14x14x64 con normalización por lote y activación ReLU
+    X = Conv2DTranspose(filters    =64, 
+                        kernel_size=3, 
+                        strides    =1, 
+                        padding    ='same')(X)
+    X = BatchNormalization()(X)
+    X = LeakyReLU(alpha=0.01)(X)
+    
+    # Convolución transpuesta, tensor de 14x14x128 a 28x28x1, con activación tahn
+    output = Conv2DTranspose(filters    =1, 
+                        kernel_size=3, 
+                        strides    =2, 
+                        padding    ='same',
+                        activation ='tanh')(X)
+    
+    generator_model = Model(inputs = [z, y], outputs = [output], name ='generator')
+    
+    return generator_model
+</code></pre><pre><code class="python">generator = build_generator(img_shape, z_dim)
+generator.summary()
+</code></pre><pre><code>Model: "generator"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to                     
+==================================================================================================
+input_2 (InputLayer)            [(None, 1)]          0                                            
+__________________________________________________________________________________________________
+input_1 (InputLayer)            [(None, 20)]         0                                            
+__________________________________________________________________________________________________
+embedding (Embedding)           (None, 1, 50)        500         input_2[0][0]                    
+__________________________________________________________________________________________________
+dense_1 (Dense)                 (None, 12544)        263424      input_1[0][0]                    
+__________________________________________________________________________________________________
+dense (Dense)                   (None, 1, 49)        2499        embedding[0][0]                  
+__________________________________________________________________________________________________
+reshape_1 (Reshape)             (None, 7, 7, 256)    0           dense_1[0][0]                    
+__________________________________________________________________________________________________
+reshape (Reshape)               (None, 7, 7, 1)      0           dense[0][0]                      
+__________________________________________________________________________________________________
+concatenate (Concatenate)       (None, 7, 7, 257)    0           reshape_1[0][0]                  
+                                                                 reshape[0][0]                    
+__________________________________________________________________________________________________
+conv2d_transpose (Conv2DTranspo (None, 14, 14, 128)  296192      concatenate[0][0]                
+__________________________________________________________________________________________________
+batch_normalization (BatchNorma (None, 14, 14, 128)  512         conv2d_transpose[0][0]           
+__________________________________________________________________________________________________
+leaky_re_lu (LeakyReLU)         (None, 14, 14, 128)  0           batch_normalization[0][0]        
+__________________________________________________________________________________________________
+conv2d_transpose_1 (Conv2DTrans (None, 14, 14, 64)   73792       leaky_re_lu[0][0]                
+__________________________________________________________________________________________________
+batch_normalization_1 (BatchNor (None, 14, 14, 64)   256         conv2d_transpose_1[0][0]         
+__________________________________________________________________________________________________
+leaky_re_lu_1 (LeakyReLU)       (None, 14, 14, 64)   0           batch_normalization_1[0][0]      
+__________________________________________________________________________________________________
+conv2d_transpose_2 (Conv2DTrans (None, 28, 28, 1)    577         leaky_re_lu_1[0][0]              
+==================================================================================================
+Total params: 637,752
+Trainable params: 637,368
+Non-trainable params: 384
+__________________________________________________________________________________________________
+</code></pre><h2 id="discriminator">Discriminator</h2><p>The discriminator $D(x | y)$ acts as a judge, trying to separate the images that come are real or images that are generated. In the Conditional GAN, the discriminator has as input an image and the conditional input $y$, which indicates the mode of the input, or for this case, the number at which the image correspond.</p><p>The architecture of  discriminator is similar to the generator. For instance, we map our conditional variable $y$ to a low dimentional embedding to which is then upscaled to the same length and width of the image by a dense layer and finally added to the image input as an extra layer.</p><p>The backbone is a convolutional neural network with a single neuron and a sigmoid activation, which outputs the prediction of the dicriminator, that being if the image is real, or if it comes from the generator.</p><pre><code class="python">def build_discriminator(img_shape, n_classes = 10, verbose=False):
+
+    Xin = Input(shape=(img_shape[0],img_shape[1],img_shape[2],))
+
+    Yin = Input(shape=(1,))
+
+    # Mapeamos la entrada condicional a un embedding de baja dimensionalidad
+    # rescalamos usando una capa densa al mismo tamaño que la imagen y
+    # lo concatamos como un canal adiciónal
+    Y   = Embedding(n_classes, 50)(Yin)
+
+    Y   = Dense(img_shape[0] * img_shape[1] * img_shape[2], input_dim = 50)(Y)
+    Y   = Reshape(img_shape)(Y)
+
+    X   = Concatenate()([Xin, Y])
+
+    # Convolución2D tensor de 28x28x1 a 14x14x32 y activación Leaky ReLU
+    X = Conv2D(filters     = 32, 
+               kernel_size = 3, 
+               strides     = 2, 
+               input_shape = (img_shape[0],img_shape[1],img_shape[2] + 1), 
+               padding     = 'same')(X)
+    #X = BatchNormalization()(X)
+    X = LeakyReLU(alpha    = 0.01)(X)
+
+    # Convolución2D tensor de 14x14x32 a 7x7x64, con normalización por lote y activación Leaky ReLU
+    X = Conv2D(filters     = 64, 
+               kernel_size = 3, 
+               strides     = 2, 
+               padding     = 'same')(X)
+    X = BatchNormalization()(X)
+    X = LeakyReLU(alpha    = 0.01)(X)
+
+    # Convolución2D tensor de 7x7x64 a 3x3x128, con normalización por lote y activación Leaky ReLU
+    X = Conv2D(filters     = 128, 
+               kernel_size = 3, 
+               strides     = 2,  
+               padding     = 'same')(X)
+    X = BatchNormalization()(X)
+    X = LeakyReLU(alpha    = 0.01)(X)
+
+    # Aplanado del tensor, y capa densa de salida de clasificacion con activación sigmoide
+    X = Flatten()(X)
+    Yout = Dense(1, activation='sigmoid')(X)
+
+    discriminator_model = Model(inputs = [Xin, Yin], outputs = [Yout], name ='discriminator')
+
+    return discriminator_model
+</code></pre><pre><code class="python">discriminator = build_discriminator(img_shape)
+discriminator.summary()
+</code></pre><pre><code>Model: "discriminator"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to                     
+==================================================================================================
+input_4 (InputLayer)            [(None, 1)]          0                                            
+__________________________________________________________________________________________________
+embedding_1 (Embedding)         (None, 1, 50)        500         input_4[0][0]                    
+__________________________________________________________________________________________________
+dense_2 (Dense)                 (None, 1, 784)       39984       embedding_1[0][0]                
+__________________________________________________________________________________________________
+input_3 (InputLayer)            [(None, 28, 28, 1)]  0                                            
+__________________________________________________________________________________________________
+reshape_2 (Reshape)             (None, 28, 28, 1)    0           dense_2[0][0]                    
+__________________________________________________________________________________________________
+concatenate_1 (Concatenate)     (None, 28, 28, 2)    0           input_3[0][0]                    
+                                                                 reshape_2[0][0]                  
+__________________________________________________________________________________________________
+conv2d (Conv2D)                 (None, 14, 14, 32)   608         concatenate_1[0][0]              
+__________________________________________________________________________________________________
+leaky_re_lu_2 (LeakyReLU)       (None, 14, 14, 32)   0           conv2d[0][0]                     
+__________________________________________________________________________________________________
+conv2d_1 (Conv2D)               (None, 7, 7, 64)     18496       leaky_re_lu_2[0][0]              
+__________________________________________________________________________________________________
+batch_normalization_2 (BatchNor (None, 7, 7, 64)     256         conv2d_1[0][0]                   
+__________________________________________________________________________________________________
+leaky_re_lu_3 (LeakyReLU)       (None, 7, 7, 64)     0           batch_normalization_2[0][0]      
+__________________________________________________________________________________________________
+conv2d_2 (Conv2D)               (None, 4, 4, 128)    73856       leaky_re_lu_3[0][0]              
+__________________________________________________________________________________________________
+batch_normalization_3 (BatchNor (None, 4, 4, 128)    512         conv2d_2[0][0]                   
+__________________________________________________________________________________________________
+leaky_re_lu_4 (LeakyReLU)       (None, 4, 4, 128)    0           batch_normalization_3[0][0]      
+__________________________________________________________________________________________________
+flatten (Flatten)               (None, 2048)         0           leaky_re_lu_4[0][0]              
+__________________________________________________________________________________________________
+dense_3 (Dense)                 (None, 1)            2049        flatten[0][0]                    
+==================================================================================================
+Total params: 136,261
+Trainable params: 135,877
+Non-trainable params: 384
+__________________________________________________________________________________________________
+</code></pre><h2 id="loss-function">Loss function</h2><p>In a nutshell, the generator acts as a painter that tries to pass his work as legitimate or as work of a famus painter, the discriminator is an expert that has to make sure the generator does not pass his work as legitimate and only original work is accepted. Here, the painter is not allowed to see original work and insted it only recives the feedback from the discriminator to learn how to pass his work as original.</p><p>More formally, this is called a minimax game that can be expressed in the following equation:</p><p>$$ \underset{G}{min} : \underset{D}{max} : V(D, G) = \mathbb{E}<em>{x ~ p</em>{data}(x)} [logD(x|y)] + \mathbb{E}<em>{x ~ p</em>{z}(z)}[log(1 - D(G(z|y)))]$$</p><p>Where $G$ is the generator, $D$ is the discriminator. The image $x$ has a distribution $p_{data}$, and $p_{z}$ is the latent noise distribution from where we sample to generate the images; for this notebook we will use a Gaussian distribution. The only difference with respect the original minmax game proposed for the GAN, is that the inputs $x$ and $z$ are conditioned by a latent variable $y$, that tells information about a particular mode.</p><pre><code class="python">cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+</code></pre><h3 id="for-discriminator">For discriminator</h3><p>The discriminator want to maximize its correct answers, and thus it whants to maximize the expected value of real images detected $ \mathbb{E}<em>{x ~ p</em>{data}(x)} [logD(x|y)]$, that is, the result of $D(x|y)$ always yields 1 (it's a real painting). And maximize the number of times it finds an image generated $\mathbb{E}<em>{x ~ p</em>{z}(z)}[log(1 - D(G(z|y)))$, that is, the result of $D(G(z|y))$ always yields 0 (it's not real).</p><pre><code class="python">def discriminator_loss_classic(real_output, fake_output):
+    # pérdida de los verdaeros (1 vs y_hat )
+    real_loss = cross_entropy(tf.ones_like(real_output), real_output)
+    # pérdida de los sintéticos (0 vs y_hat )
+    fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
+    # suma de los dos tipos de errores
+    total_loss = real_loss + fake_loss
+    return total_loss
+
+def discriminator_loss(real_output, fake_output):
+    # pérdida de los verdaeros (1 vs y_hat )   + pérdida de los sintéticos (0 vs y_hat 
+    total_loss = -tf.reduce_mean(tf.keras.backend.log(real_output) + tf.keras.backend.log(1.- fake_output))
+    return total_loss
+</code></pre><h3 id="for-generator">For generator</h3><p>the generator whants to fool the discriminator, and since it does not have direct control on the results with real images, it can insted improve the quality of the fake image and reduce $\mathbb{E}<em>{x ~ p</em>{z}(z)}[log(1 - D(G(z|y)))$, that is, making $D(G(z|y))$ always 1 (the fake image is real for the discriminator)</p><pre><code class="python">def generator_loss_classic(fake_output):
+    return cross_entropy(tf.ones_like(fake_output), fake_output)
+
+def generator_loss(real_output,fake_output):
+    #  pérdida de los sintéticos (0 vs y_hat 
+    total_loss = -tf.reduce_mean(tf.keras.backend.log(fake_output))
+    return total_loss
+</code></pre><h2 id="optimizers">Optimizers</h2><pre><code class="python">generator_optimizer     = tf.keras.optimizers.Adam(1e-5)
+discriminator_optimizer = tf.keras.optimizers.Adam(1e-5)
+</code></pre><h2 id="training">Training</h2><ol><li>Obtain a batch of real images $X$ with their respective labels $y_X$.</li><li>Obtain a batch of latent variables whit a uniformly sampled labels $y_Z$.</li><li>Obtain the fake images from the latent and conditional variables.</li><li>Obtain the results for real and fake images from the discriminator.</li><li>Calculate the loss for the discriminator and generator.</li><li>Calculate the gradients.</li><li>Make a backpropagation step and update the weights for both models.</li></ol><pre><code class="python">#El decorador `tf.function` indica que la función se "compila" para que pueda incluirse en un gráfo de calculo.
+
+@tf.function
+def train_step(images, labels):
+    '''
+
+    Implementa un paso de entrenamiento para la GAN
+
+    Recibe como parámetros un semi-lote de imágenes reales
+    '''
+
+    # variables latentes (ruido Gaussiano), tantas como imagenes reales
+    z = tf.random.normal([images.shape[0], z_dim])
+
+    # Generamos las etiquetas de forma aleatoria correspondientes con cada una
+    # de las variables latentes.
+    y = tf.random.uniform(shape=[images.shape[0], ], minval=0, maxval=10, dtype=tf.int64)
+
+    # Los siguientes pasos registaran (en "TAPE") para efectos de calcular gradientes
+    # son dos "Tapes" para registrar los calculos de cada modelo
+    with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+
+        # genera el semi-lote de datos sintéticos
+        generated_images = generator([z, y], training=True)
+
+        # calcula la predicción para datos verdaderos y falsos
+        real_output = discriminator([images, labels], training=True)
+        fake_output = discriminator([generated_images, y], training=True)
+
+        # calcula las pérdidas del Discriminador y del Generador
+        disc_loss = discriminator_loss(real_output, fake_output)
+        gen_loss  = generator_loss(real_output, fake_output)
+
+    # Para cada modelo, calcula el gradiente de su función de costo respecto a sus pesos entrenables, 
+    # haciendo retropropagación sobre los calculos realizados
+    gradients_of_generator     = gen_tape.gradient(gen_loss, generator.trainable_variables)
+    gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+
+    # Hace el paso de actualizacion de los pesos
+    generator_optimizer.apply_gradients(zip(gradients_of_generator, generator.trainable_variables))
+    discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
+    
+    return gen_loss, disc_loss
+</code></pre><p>For each 5 epoch, we will visualize a set of images to see the evolution of the generator.</p><pre><code class="python">from PIL import Image
+import imageio
+import glob
+plt.rcParams['figure.dpi'] = 200
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - 
+# Crea una collage de imágenes con el Generador y la guarda
+# - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+image_grid_rows          = 10
+image_grid_columns       = 4
+
+num_examples_to_generate = image_grid_rows * image_grid_columns
+seed           = tf.random.normal([num_examples_to_generate, z_dim])
+lst            = range(0,10)
+lst            = list(itertools.chain.from_iterable(itertools.repeat(x, 4) for x in lst))
+labels_seed    = tf.convert_to_tensor(lst)
+
+def generate_and_save_images(model, epoch, test_input, pathdir=path_results):
+    """
+    Args:
+        test_input: [z, y]
+    """
+    # Se pone entrenable en Falso porque esta en modo inferencia el 
+    predictions = model(test_input, training=False)
+
+    fig, axs = plt.subplots(image_grid_rows,                                 
+                            image_grid_columns,
+                            figsize=(28, 28),
+                            sharey=True,
+                            sharex=True)
+
+    cnt = 0
+    for i in range(image_grid_rows):
+        for j in range(image_grid_columns):
+            axs[i, j].imshow(predictions[cnt, :, :, 0], cmap='gray')            
+            axs[i, j].axis('off')
+            axs[i, j].set_title("Digit: %d" % lst[cnt])
+            cnt += 1
+
+    plt.savefig(pathdir+'image_epch_{:04d}.png'.format(epoch))
+    plt.show()
+# - - - - - - - - - - - - - - - - - - - - - - - - - - 
+# Despliega la imagen correspondiente a una época
+# - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+def display_image(epoch_no, pathdir=path_results):
+    return Image.open(pathdir+'image_epch_{:04d}.png'.format(epoch_no))
+</code></pre><pre><code class="python">from IPython import display
+import time 
+
+def train(dataset, epochs):
+    
+    generator_losses=[] 
+    discriminator_losses=[]
+    for epoch in range(epochs):
+        start = time.time()
+
+        for (image_batch, labels_batch) in dataset:
+            gen_loss, disc_loss = train_step(image_batch, labels_batch)
+
+        # solo registramos los costos en el último lote
+        generator_losses.append(gen_loss)
+        discriminator_losses.append(disc_loss)
+        
+        # Produce imágenes para crear el GIF
+        if (epoch+1)%each_save ==0:
+            display.clear_output(wait=True)  # limpia el buffer
+            generate_and_save_images(generator,
+                                     epoch + 1,
+                                     [seed, labels_seed])
+        
+        print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
+
+    # Genera las las imágens correspondientes a la época final
+    display.clear_output(wait=True)
+    generate_and_save_images(generator,
+                               epochs,
+                               [seed, labels_seed])
+    
+    return np.array(generator_losses), np.array(discriminator_losses)
+</code></pre><h3 id="gan-training">GAN Training</h3><p>And now, we train the GAN.</p><pre><code class="python">#generator_losses, discriminator_losses = train(train_dataset, num_epochs)
+</code></pre><p><img src="conditional_gan_javier_antonio_gonzalez_trejo_files/conditional_gan_javier_antonio_gonzalez_trejo_29_0.png" alt="png" /></p><pre><code class="python">display_image(num_epochs)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_30_0.png" alt="png" /></p><h2 id="save-models">Save models</h2><pre><code class="python">#generator.save_weights('con_dcgan_generator_0_1.h5')
+#discriminator.save_weights('con_dcgan_discriminator_0_1.h5')
+</code></pre><pre><code class="python">generator.load_weights('con_dcgan_generator_0_1.h5')
+discriminator.load_weights('con_dcgan_discriminator_0_1.h5')
+</code></pre><pre><code class="python">plt.figure(figsize=(12,4))
+plt.subplot(131)
+plt.plot(generator_losses, 'r')
+plt.title('$J^G$')
+plt.subplot(132)
+plt.plot(discriminator_losses, 'g')
+plt.title('$J^D$')
+plt.subplot(133)
+plt.plot(generator_losses+discriminator_losses, 'b')
+plt.title('$J^G+J^D$')
+plt.show()
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_34_0.png" alt="png" /></p><h2 id="results-discussion">Results discussion</h2><pre><code class="python">display_image(40)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_36_0.png" alt="png" /></p><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_36_1.png" alt="png" /></p><pre><code class="python">display_image(65)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_37_0.png" alt="png" /></p><pre><code class="python">display_image(155)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_38_0.png" alt="png" /></p><pre><code class="python">display_image(100)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_39_0.png" alt="png" /></p><p>Taking a look into the results and the loss graphs, we see that the Conditional GAN starts to learn to produce number images from the latent variables, but at the epoch 40 where this ocurr, we still do not see the conditional variable $y$ take effect, insted the number are produced at random. Example: we see an $8$ in the row of ones.</p><p>Is not upt to when the loss decreeses for the discriminator and incresses for the generator in epoch 65 where we start to see the efect of the conditional variable $y$, where almost all the images correspond to the labels designated.</p><p>We see the GAN reaching it's best performance at around epoch 155, where we see pretty realistic results aligned with their respective assignated label.</p><p>It's clear that the conditional variable "y" has effect on which mode to produce from the latent variable, while also helping in the quality of the number generates, that seems slightly bettern that the ones reported in the original code from where the GAN implementation was taken. An inconvinience is the desync in the times that the GAN learns to learn to generate number and to use the conditional variable. The following steps should be taken in futures works.</p><ol><li>Study The effect on reducing mode collapse by using conditional GAN's</li><li>The dsync could be prevented if the discriminator does not only classify as real or not real, but if the label belongs to the generated image?</li><li>Test the Conditional GAN in the fashion MNIST dataset.</li></ol>
+</div>
+
+<div id="post-tags">
+    <b>Tags: </b>
+    
+    <a href="/tags-output/deep learning/">deep learning</a>
+    
+    <a href="/tags-output/tensorflow/">tensorflow</a>
+    
+    <a href="/tags-output/GAN/">GAN</a>
+    
+</div>
+
+
+    <div id="prev-next">
+        
+        <a href="/posts-output/2020-12-13-attention/">&laquo; Analysis of attention mechanism in the task of Machine translation</a>
+        
+        
+        <a class="right" href="/posts-output/2020-10-22-grad_cam/">GRAD-CAM &raquo;</a>
+        
+    </div>
+
+    
+
+
+</div>
+
+            </div>
+        </div>
+    </div>
+    <footer>Copyright &copy; 2020 Javier Antonio Gonzalez-Trejo
+        <p style="text-align: center;">Powered by <a href="http://cryogenweb.org">Cryogen</a></p></footer>
+</div>
+<script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.0/js/bootstrap.min.js"></script>
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="/js/highlight.pack.js" type="application/javascript"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+</body>
+</html>
