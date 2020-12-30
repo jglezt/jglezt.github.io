@@ -57,11 +57,11 @@
                         <li class="divider"></li>
                         <li class="dropdown-header">Recent Posts</li>
                         
+                        <li><a href="/posts-output/2020-12-29-cgan/">Tensorflow implementation of the Conditional GAN</a></li>
+                        
                         <li><a href="/posts-output/2020-12-16-chatbot/">Spanish Chat Bot using GRU&#39;s with attention</a></li>
                         
                         <li><a href="/posts-output/2020-12-13-attention/">Analysis of attention mechanism in the task of Machine translation</a></li>
-                        
-                        <li><a href="/posts-output/2020-12-29-cgan/">Tensorflow implementation of the Conditional GAN</a></li>
                         
                         
 
@@ -69,17 +69,17 @@
                         <li class="divider"></li>
                         <li class="dropdown-header">Tags</li>
                         
-                        <li><a href="/tags-output/nlp/">nlp</a></li>
-                        
                         <li><a href="/tags-output/deep learning/">deep learning</a></li>
-                        
-                        <li><a href="/tags-output/gru/">gru</a></li>
-                        
-                        <li><a href="/tags-output/attention/">attention</a></li>
                         
                         <li><a href="/tags-output/tensorflow/">tensorflow</a></li>
                         
                         <li><a href="/tags-output/GAN/">GAN</a></li>
+                        
+                        <li><a href="/tags-output/nlp/">nlp</a></li>
+                        
+                        <li><a href="/tags-output/gru/">gru</a></li>
+                        
+                        <li><a href="/tags-output/attention/">attention</a></li>
                         
                         <li><a href="/tags-output/object detection/">object detection</a></li>
                         
@@ -104,1549 +104,449 @@
 <div id="post">
     <div class="post-header">
     <div id="post-meta" class="row">
-        <div class="col-lg-6">December 16, 2020</div>
+        <div class="col-lg-6">December 29, 2020</div>
         
         <span class="col-lg-6 right">By: Javier Antonio Gonzalez-Trejo</span>
         
     </div>
-    <h2>Spanish Chat Bot using GRU&#39;s with attention</h2>
+    <h2>Tensorflow implementation of the Conditional GAN</h2>
 </div>
 <div>
-    <ol class="toc"><li><a href="#code-from-joosthub">Code from <a href="https://github.com/joosthub/PyTorchNLPBook/tree/master/chapters/chapter_8">joosthub</a></a></li><li><a href="#dataset-description">Dataset description</a></li><li><a href="#use-the-notebook-in-colab">Use the notebook in colab</a></li><li><a href="#load-local-libraries">Load local libraries</a></li><li><a href="#load-the-data">Load the data</a></li><li><a href="#dataset-implementation">Dataset implementation</a></li><li><a href="#train-the-model">Train the model</a></li><li><a href="#testing-the-model">Testing the model</a></li><li><a href="#conclusions">Conclusions</a></li></ol>
-    <h2 id="code-from-joosthub">Code from <a href="https://github.com/joosthub/PyTorchNLPBook/tree/master/chapters/chapter_8">joosthub</a></h2><p>and <a href="https://medium.com/@ruben_onelove/como-hacer-un-chatbot-en-espa%C3%B1ol-y-que-te-trolee-en-el-intento-2a8105d66de8">Rubén Chaves</a></p><p>The task tackled in this notebook will be different from the two previosly presented. Here, insted of translating a sequence from English to French and evaluate the different kinds of attention models that can be used with seq2seq architectures, we will develop a conversational ChatBot in spanish.
-For the chatbot to work, it need conversational sequences; the input sequence is a sentence directed to the chatbot and the output sequence shold be response to that sequence. For that, and since for spanish there is not that much work public available, we will use the OpenSubtitles dataset.</p><h2 id="dataset-description">Dataset description</h2><p>The OpenSubtitles dataset contains scripts of movies, series, etc for 62 different languages. For this task, we are only interested in the spanish subtitles that have conversations between characters.</p><p>The data preprosessing is already provided by Rúben Chaves. The dataset has the following characteristics</p><ol><li><p>The number of sequences pairs is of 397,521 (I used only 44169) with a vocab of 13720, which is the 24.73% of the all the words found on the document.</p></li><li><p>Only the sequences with less than 40 tokens were kept.</p></li><li><p>Words were kept if they appear in the document if they appear more or equal to 10 times.</p></li><li><p>Special tokens: PAD for padding shor sequences; SOS to indicate the beggining of a sequence; EOS to indicate the end of a sequence; and UNK to indicate the vocab that is unkown.</p></li><li><p>Response sequences do not have UNK tokens, in order to make the model to not use such token as an output.</p></li></ol><pre><code class="python">import os
-import random
-from argparse import Namespace
-from collections import Counter
-import json
-import re
-import string
-import pickle
-import functools
+    <ol class="toc"><li><a href="#original-paper-conditional-generative-adversarial-nets">Original Paper <a href="https://arxiv.org/abs/1411.1784">Conditional Generative Adversarial Nets</a></a></li><li><a href="#dcgan-code-from-phd-mariano-rivera">DCGAN Code from <a href="https://www.cimat.mx/~mrivera/cursos/aprendizaje_profundo/dcgan/dcgan.html">PhD Mariano Rivera</a></a></li><li><a href="#load-the-altunet-model">Load the AltUnet model</a></li><li><a href="#general-parameters">General parameters</a></li><li><a href="#generator">Generator</a></li><ol><li><a href="#discriminator">Discriminator</a></li><li><a href="#loss-function">Loss function</a></li><ol><li><a href="#for-discriminator">For discriminator</a></li><li><a href="#for-generator">For generator</a></li></ol><li><a href="#optimizers">Optimizers</a></li><li><a href="#training">Training</a></li><ol><li><a href="#gan-training">GAN Training</a></li></ol><li><a href="#save-models">Save models</a></li><li><a href="#results-discussion">Results discussion</a></li></ol></ol>
+    <h2 id="original-paper-conditional-generative-adversarial-nets">Original Paper <a href="https://arxiv.org/abs/1411.1784">Conditional Generative Adversarial Nets</a></h2><h2 id="dcgan-code-from-phd-mariano-rivera">DCGAN Code from <a href="https://www.cimat.mx/~mrivera/cursos/aprendizaje_profundo/dcgan/dcgan.html">PhD Mariano Rivera</a></h2><p>In this notebook, we will train a Unimodal conditional Generative Advertial Neural Network.
+In a nutshell, a conditional Generative Advertial Neural Network (GAN)is simply a GAN with an additional input $y$ for both the discriminator and the generator.
+This additional input "conditions" the output of the generator and what kind of data the discriminator is looking for.
+The objective is to have better control the modes of the data generated. This kind of control could be done using only the noise feed to the GAN without the conditioning, the problem is that it can not be for sure how this relationship beteewn the noise "z" is with respect the GAN output.</p><pre><code class="python">import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID";
+os.environ["CUDA_VISIBLE_DEVICES"]="0";
 
-import tqdm
-import nltk
+import tensorflow as tf
+print(tf.__version__)
+if tf.test.gpu_device_name():
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+    print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+else:
+    print("Please install GPU version of TF")
+</code></pre><pre><code>2.3.1
+Default GPU Device: /device:GPU:0
+</code></pre><pre><code class="python">%matplotlib inline
+import sys
 import numpy as np
 import pandas as pd
-import random as rnd
-import torch
-import torch.nn as nn
 import itertools
-from torch.nn import functional as F
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-from tqdm import notebook, tqdm
-from torch.nn.utils.rnn import pad_sequence
-
-import seaborn as sns
 import matplotlib.pyplot as plt
 
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
-</code></pre><h2 id="use-the-notebook-in-colab">Use the notebook in colab</h2><pre><code class="python">from google.colab import drive
-drive.mount('/content/drive/')
-</code></pre><pre><code>---------------------------------------------------------------------------
-
-ModuleNotFoundError                       Traceback (most recent call last)
-
-&lt;ipython-input-2-91874b305a32&gt; in &lt;module&gt;
-----&gt; 1 from google.colab import drive
-      2 drive.mount('/content/drive/')
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.layers import Input, Dense, Reshape, Flatten, Dropout
+from tensorflow.keras.layers import BatchNormalization, ZeroPadding2D
+from tensorflow.keras.layers import Activation, LeakyReLU, Concatenate
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose, Embedding
+import tensorflow_datasets as tfds
 
 
-ModuleNotFoundError: No module named 'google'
-</code></pre><pre><code class="python">ROOT_DIR = "/content/drive/MyDrive/semester_3/tarea_chat_bot_javier_antonio_gonzalez_trejo"
-for file in os.listdir(ROOT_DIR):
-  try:
-    shutil.copy(os.path.join(ROOT_DIR, file), 
-                os.path.join('.', file))
-  except IsADirectoryError:
-    shutil.copytree(os.path.join(ROOT_DIR, file), 
-                  os.path.join('.', file))
-</code></pre><pre><code>---------------------------------------------------------------------------
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.utils import plot_model
+</code></pre><pre><code class="python">def reset_weights(model):
+    '''
+    Reinicializa los pesos del modelo 
+    '''
+    for ix, layer in enumerate(model.layers):
+        if hasattr(model.layers[ix], 'kernel_initializer') and \
+                hasattr(model.layers[ix], 'bias_initializer'):
+            weight_initializer = model.layers[ix].kernel_initializer
+            bias_initializer   = model.layers[ix].bias_initializer
 
-FileNotFoundError                         Traceback (most recent call last)
+            old_weights, old_biases = model.layers[ix].get_weights()
 
-&lt;ipython-input-3-1f8d61420637&gt; in &lt;module&gt;
-      1 ROOT_DIR = "/content/drive/MyDrive/semester_3/tarea_chat_bot_javier_antonio_gonzalez_trejo"
-----&gt; 2 for file in os.listdir(ROOT_DIR):
-      3   try:
-      4     shutil.copy(os.path.join(ROOT_DIR, file), 
-      5                 os.path.join('.', file))
+            model.layers[ix].set_weights([
+                weight_initializer(shape=old_weights.shape),
+                bias_initializer  (shape  =len(old_biases))])
+</code></pre><h2 id="load-the-altunet-model">Load the AltUnet model</h2><p>We will convert the AltNet model from pytorch to tensorflow using the library <code>pytorch2keras</code>, but for that, we need that the memory of the GPU which is not accesible once tensorflow is making use of it.</p><h2 id="general-parameters">General parameters</h2><p>Here, we load the training examples and its labels, since they are needed to train the Conditional GAN.
+The dataset will be the clasical MNIST, which containts images of all digits hand drawn. The shape of each image is $28 \times 28 \times 1$.</p><pre><code class="python"># carga datos reales
+(X_train, y_train), (_, _) = mnist.load_data()
 
+# Rescale -1 to 1
+X_train = X_train / 127.5 - 1.
+X_train = np.expand_dims(X_train, axis=3)
+y_train = np.expand_dims(y_train, axis=1)
+</code></pre><pre><code class="python">(buffer_size,img_rows, img_cols, channels) = X_train.shape
+img_shape  = (img_rows, img_cols, channels)
+z_dim      = 20     # dimensión del espacio latente
+batch_size = 256
+num_epochs = 200
+each_save  = 5
 
-FileNotFoundError: [Errno 2] No such file or directory: '/content/drive/MyDrive/semester_3/tarea_chat_bot_javier_antonio_gonzalez_trejo'
-</code></pre><h2 id="load-local-libraries">Load local libraries</h2><pre><code class="python">from model import NMTDecoder, NMTModel, BahdanauAttention
-from training import set_seed_everywhere, make_train_state,\
-    update_train_state, compute_accuracy, sequence_loss
+path_results = 'cdcgan_results_tensorflow/'
+</code></pre><pre><code class="python">train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train)).shuffle(buffer_size).batch(batch_size)
+train_dataset
+</code></pre><pre><code>&lt;BatchDataset shapes: ((None, 28, 28, 1), (None, 1)), types: (tf.float64, tf.uint8)&gt;
+</code></pre><h1 id="generator">Generator</h1><p>The generator $G(z | y)$ will learn the distribution $p_g$ from the dataset MNIST by mapping the input z conditioned by a label $y \in {0 \dots 9}$ using a non linear mapping function, in this case a Convolutional Neural Network $G$.</p><p>The architecture of the Generator is as follows, we have two inputs, the input comming from the Gaussian distribution of shape $20$ and the conditional input $y$ of shape $10$ from which we will indicate the generator what number to produce. The input shape is feed to a low dimensionality embedding layer to have a vector of shape $50$, then we rescalate the input to be of shape $7 \times 7 \times 1 $ in order to be concatated as an additonal channel later. The input z passes through a dense layer to be rescalated to a  shape of $7 \times 7 \times 256 $. This result is concatenated with the output of the input $y$ branch.</p><p>After that, we have the transposed convolutional layers, that reduces the dimentionality of the input while incrementing the resolution by a factor two each layer up to the shape of $28 \times 28$.</p><p>Each layer has leaky relu activation to avoid sparce gradients.</p><p>The last layer has an activation layer $tanh$ which presented very good results in the DCGAN original paper (here)[https://arxiv.org/pdf/1511.06434.pdf].</p><pre><code class="python">def build_generator(img_shape, z_dim, n_classes = 10, verbose=False):
+    '''
+    Genera una imagen de 28x28x1 a partir de un vector aleatorio de 100 entradas (espacio latente)
+    condicionado por una entrada labels, que indicara el numero a generar.
+    '''
 
-from utils import expand_filepaths_to_save_dir, handle_dirs
-</code></pre><h2 id="load-the-data">Load the data</h2><p>First, leats load the data from the dataset files provided.</p><p>This is th vocabulary implementation that is hardcoded in the dataset.</p><pre><code class="python">class Voc:
-    def __init__(self, name):
-        self.name = name
-        self.trimmed = False
-        self.word2index = {"UNK": UNK_token}
-        self.word2count = {}
-        self.index2word = {PAD_token: "PAD", SOS_token: "SOS", EOS_token: "EOS"}
-        self.num_words = 3  # Count SOS, EOS, PAD
+    z = Input(shape=(z_dim,))
 
-    def addSentence(self, spl_sent):
-        for word in spl_sent:
-            self.addWord(word)
+    # La entrada sera un escalar indicando el numero a generar
+    y = Input(shape=(1,))
 
-    def addWord(self, word):
-        if word not in self.word2index:
-            self.word2index[word] = self.num_words
-            self.word2count[word] = 1
-            self.index2word[self.num_words] = word
-            self.num_words += 1
-        else:
-            self.word2count[word] += 1
+    # Utilizando las sugerencias curadas de https://github.com/soumith/ganhacks,
+    # usamos, un embedding de baja dimensionalidad.
+    Y = Embedding(n_classes, 50)(y)
 
-    # Remove words below a certain count threshold
-    def trim(self, min_count):
-        if self.trimmed:
-            return
-        self.trimmed = True
+    # Reescalamos la salida del embedding a 7 * 7
+    Y = Dense(7 * 7, input_dim = 50)(Y)
+    Y = Reshape((7, 7, 1))(Y)
 
-        keep_words = []
+    # Pasa entrada unidimensional de dimensión 20 en un tensor de (7)(7)(256) tensor via un red Densa
+    # luego la reformatea en un tensor de 7x7x128
+    X = Dense(256 * 7 * 7, input_dim=z_dim) (z)
+    X = Reshape((7, 7, 256))(X)
 
-        for k, v in self.word2count.items():
-            if v &gt;= min_count:
-                keep_words.append(k)
+    # Añadimos tanto la rama de z asi como y.
+    X = Concatenate()([X, Y])
 
-        print(f"keep_words {len(keep_words)} / { len(self.word2index)} = "
-              f"{len(keep_words) / len(self.word2index):.4f}")
+    # Convolución transpuesta, tensor de 7x7x257 a 14x14x128, con normalización por lote y activación ReLU
+    X = Conv2DTranspose(filters    =128, 
+                        kernel_size=3, 
+                        strides    =2, 
+                        padding    ='same')(X)
+    X = BatchNormalization()(X)
+    X = LeakyReLU(alpha=0.01)(X)
+    
+    # Convolución transpuesta, tensor de 14x14x128, a 14x14x64 con normalización por lote y activación ReLU
+    X = Conv2DTranspose(filters    =64, 
+                        kernel_size=3, 
+                        strides    =1, 
+                        padding    ='same')(X)
+    X = BatchNormalization()(X)
+    X = LeakyReLU(alpha=0.01)(X)
+    
+    # Convolución transpuesta, tensor de 14x14x128 a 28x28x1, con activación tahn
+    output = Conv2DTranspose(filters    =1, 
+                        kernel_size=3, 
+                        strides    =2, 
+                        padding    ='same',
+                        activation ='tanh')(X)
+    
+    generator_model = Model(inputs = [z, y], outputs = [output], name ='generator')
+    
+    return generator_model
+</code></pre><pre><code class="python">generator = build_generator(img_shape, z_dim)
+generator.summary()
+</code></pre><pre><code>Model: "generator"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to                     
+==================================================================================================
+input_2 (InputLayer)            [(None, 1)]          0                                            
+__________________________________________________________________________________________________
+input_1 (InputLayer)            [(None, 20)]         0                                            
+__________________________________________________________________________________________________
+embedding (Embedding)           (None, 1, 50)        500         input_2[0][0]                    
+__________________________________________________________________________________________________
+dense_1 (Dense)                 (None, 12544)        263424      input_1[0][0]                    
+__________________________________________________________________________________________________
+dense (Dense)                   (None, 1, 49)        2499        embedding[0][0]                  
+__________________________________________________________________________________________________
+reshape_1 (Reshape)             (None, 7, 7, 256)    0           dense_1[0][0]                    
+__________________________________________________________________________________________________
+reshape (Reshape)               (None, 7, 7, 1)      0           dense[0][0]                      
+__________________________________________________________________________________________________
+concatenate (Concatenate)       (None, 7, 7, 257)    0           reshape_1[0][0]                  
+                                                                 reshape[0][0]                    
+__________________________________________________________________________________________________
+conv2d_transpose (Conv2DTranspo (None, 14, 14, 128)  296192      concatenate[0][0]                
+__________________________________________________________________________________________________
+batch_normalization (BatchNorma (None, 14, 14, 128)  512         conv2d_transpose[0][0]           
+__________________________________________________________________________________________________
+leaky_re_lu (LeakyReLU)         (None, 14, 14, 128)  0           batch_normalization[0][0]        
+__________________________________________________________________________________________________
+conv2d_transpose_1 (Conv2DTrans (None, 14, 14, 64)   73792       leaky_re_lu[0][0]                
+__________________________________________________________________________________________________
+batch_normalization_1 (BatchNor (None, 14, 14, 64)   256         conv2d_transpose_1[0][0]         
+__________________________________________________________________________________________________
+leaky_re_lu_1 (LeakyReLU)       (None, 14, 14, 64)   0           batch_normalization_1[0][0]      
+__________________________________________________________________________________________________
+conv2d_transpose_2 (Conv2DTrans (None, 28, 28, 1)    577         leaky_re_lu_1[0][0]              
+==================================================================================================
+Total params: 637,752
+Trainable params: 637,368
+Non-trainable params: 384
+__________________________________________________________________________________________________
+</code></pre><h2 id="discriminator">Discriminator</h2><p>The discriminator $D(x | y)$ acts as a judge, trying to separate the images that come are real or images that are generated. In the Conditional GAN, the discriminator has as input an image and the conditional input $y$, which indicates the mode of the input, or for this case, the number at which the image correspond.</p><p>The architecture of  discriminator is similar to the generator. For instance, we map our conditional variable $y$ to a low dimentional embedding to which is then upscaled to the same length and width of the image by a dense layer and finally added to the image input as an extra layer.</p><p>The backbone is a convolutional neural network with a single neuron and a sigmoid activation, which outputs the prediction of the dicriminator, that being if the image is real, or if it comes from the generator.</p><pre><code class="python">def build_discriminator(img_shape, n_classes = 10, verbose=False):
 
-        # Reinitialize dictionaries
-        self.word2index = {"UNK": UNK_token}
-        self.word2count = {}
-        self.index2word = {PAD_token: "PAD", SOS_token: "SOS", EOS_token: "EOS", UNK_token:"UNK"}
-        self.num_words = 4 # Count default tokens
+    Xin = Input(shape=(img_shape[0],img_shape[1],img_shape[2],))
 
-        for word in keep_words:
-            self.addWord(word)
-</code></pre><h2 id="dataset-implementation">Dataset implementation</h2><p>First, we open the dataset "pairs" and it's respective vocabulary "voc" which was allready preprocessed.</p><pre><code class="python">root_dir = "./data/open_subtitles_spanish/"
-with open(os.path.join(root_dir, 'voc.pkl'),  'rb') as f:
-    voc   = pickle.load(f)
+    Yin = Input(shape=(1,))
 
-with open(os.path.join(root_dir, 'pairs.pkl'),'rb') as f:
-    pairs = pickle.load(f)
-</code></pre><p>Next, we create a custom pytorch Dataset, with two objectives in mind; obtain the lengths of the sequences to feed them in the pack_padded_sequence; add the SOS token to the input sequence, finally, add the SOS and remove the EOS tokens from the sample input (which is the sequence that the model will "see" at each teacher forcing forward step).</p><p>The function pack_padded_sequence is a smaller representation of a batch where some of the values are PAD_tokens. The representation is vector where values at each diffent sequence are contiguos. The length is used to delimitate where the original data actually is.</p><pre><code class="python">PAD_token = 0  # Used for padding short sentences
-SOS_token = 1  # Start-of-sentence token
-EOS_token = 2  # End-of-sentence token
-UNK_token = 3
+    # Mapeamos la entrada condicional a un embedding de baja dimensionalidad
+    # rescalamos usando una capa densa al mismo tamaño que la imagen y
+    # lo concatamos como un canal adiciónal
+    Y   = Embedding(n_classes, 50)(Yin)
 
-class OpenSubtitlesSpanish(Dataset):
-    def __init__(self, max_sequence_length, data, pad_token = PAD_token
-                 , sos_token = SOS_token,
-                 eos_token = EOS_token, train = True):
-        training_len = int(len(data) / 9)
-        if train:
-            self.data = [data[i] for i in range(training_len)]
-        else:
-            self.data = [data[i] for i in range(training_len, len(data))]
-            
-        self.max_sequence_length = max_sequence_length
-        self.pad_token = pad_token
-        self.sos_token = sos_token
+    Y   = Dense(img_shape[0] * img_shape[1] * img_shape[2], input_dim = 50)(Y)
+    Y   = Reshape(img_shape)(Y)
 
+    X   = Concatenate()([Xin, Y])
 
-    def __len__(self):
-        return len(self.data)
+    # Convolución2D tensor de 28x28x1 a 14x14x32 y activación Leaky ReLU
+    X = Conv2D(filters     = 32, 
+               kernel_size = 3, 
+               strides     = 2, 
+               input_shape = (img_shape[0],img_shape[1],img_shape[2] + 1), 
+               padding     = 'same')(X)
+    #X = BatchNormalization()(X)
+    X = LeakyReLU(alpha    = 0.01)(X)
 
-    def add_padding(self, sequence):
-        padded_sequence =  torch.ones([self.max_sequence_length]) *\
-            self.pad_token
-        
-        padded_sequence[:len(sequence)] = torch.tensor(sequence)
+    # Convolución2D tensor de 14x14x32 a 7x7x64, con normalización por lote y activación Leaky ReLU
+    X = Conv2D(filters     = 64, 
+               kernel_size = 3, 
+               strides     = 2, 
+               padding     = 'same')(X)
+    X = BatchNormalization()(X)
+    X = LeakyReLU(alpha    = 0.01)(X)
 
-        return padded_sequence.long()
+    # Convolución2D tensor de 7x7x64 a 3x3x128, con normalización por lote y activación Leaky ReLU
+    X = Conv2D(filters     = 128, 
+               kernel_size = 3, 
+               strides     = 2,  
+               padding     = 'same')(X)
+    X = BatchNormalization()(X)
+    X = LeakyReLU(alpha    = 0.01)(X)
 
-    def add_padding_sos(self, sequence, remove_eos = False):
-        padded_sequence =  torch.ones([self.max_sequence_length]) *\
-            self.pad_token
+    # Aplanado del tensor, y capa densa de salida de clasificacion con activación sigmoide
+    X = Flatten()(X)
+    Yout = Dense(1, activation='sigmoid')(X)
 
-        if remove_eos:
-            sequence = sequence[:-1]
-        
-        # Skew to the rigth in order to add sos sequence
-        padded_sequence[1:len(sequence) + 1] = torch.tensor(sequence)
-        padded_sequence[0] = self.sos_token
+    discriminator_model = Model(inputs = [Xin, Yin], outputs = [Yout], name ='discriminator')
 
-        return padded_sequence.long()
+    return discriminator_model
+</code></pre><pre><code class="python">discriminator = build_discriminator(img_shape)
+discriminator.summary()
+</code></pre><pre><code>Model: "discriminator"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to                     
+==================================================================================================
+input_4 (InputLayer)            [(None, 1)]          0                                            
+__________________________________________________________________________________________________
+embedding_1 (Embedding)         (None, 1, 50)        500         input_4[0][0]                    
+__________________________________________________________________________________________________
+dense_2 (Dense)                 (None, 1, 784)       39984       embedding_1[0][0]                
+__________________________________________________________________________________________________
+input_3 (InputLayer)            [(None, 28, 28, 1)]  0                                            
+__________________________________________________________________________________________________
+reshape_2 (Reshape)             (None, 28, 28, 1)    0           dense_2[0][0]                    
+__________________________________________________________________________________________________
+concatenate_1 (Concatenate)     (None, 28, 28, 2)    0           input_3[0][0]                    
+                                                                 reshape_2[0][0]                  
+__________________________________________________________________________________________________
+conv2d (Conv2D)                 (None, 14, 14, 32)   608         concatenate_1[0][0]              
+__________________________________________________________________________________________________
+leaky_re_lu_2 (LeakyReLU)       (None, 14, 14, 32)   0           conv2d[0][0]                     
+__________________________________________________________________________________________________
+conv2d_1 (Conv2D)               (None, 7, 7, 64)     18496       leaky_re_lu_2[0][0]              
+__________________________________________________________________________________________________
+batch_normalization_2 (BatchNor (None, 7, 7, 64)     256         conv2d_1[0][0]                   
+__________________________________________________________________________________________________
+leaky_re_lu_3 (LeakyReLU)       (None, 7, 7, 64)     0           batch_normalization_2[0][0]      
+__________________________________________________________________________________________________
+conv2d_2 (Conv2D)               (None, 4, 4, 128)    73856       leaky_re_lu_3[0][0]              
+__________________________________________________________________________________________________
+batch_normalization_3 (BatchNor (None, 4, 4, 128)    512         conv2d_2[0][0]                   
+__________________________________________________________________________________________________
+leaky_re_lu_4 (LeakyReLU)       (None, 4, 4, 128)    0           batch_normalization_3[0][0]      
+__________________________________________________________________________________________________
+flatten (Flatten)               (None, 2048)         0           leaky_re_lu_4[0][0]              
+__________________________________________________________________________________________________
+dense_3 (Dense)                 (None, 1)            2049        flatten[0][0]                    
+==================================================================================================
+Total params: 136,261
+Trainable params: 135,877
+Non-trainable params: 384
+__________________________________________________________________________________________________
+</code></pre><h2 id="loss-function">Loss function</h2><p>In a nutshell, the generator acts as a painter that tries to pass his work as legitimate or as work of a famus painter, the discriminator is an expert that has to make sure the generator does not pass his work as legitimate and only original work is accepted. Here, the painter is not allowed to see original work and insted it only recives the feedback from the discriminator to learn how to pass his work as original.</p><p>More formally, this is called a minimax game that can be expressed in the following equation:</p><p>$$ \underset{G}{min} : \underset{D}{max} : V(D, G) = \mathbb{E}<em>{x ~ p</em>{data}(x)} [logD(x|y)] + \mathbb{E}<em>{x ~ p</em>{z}(z)}[log(1 - D(G(z|y)))]$$</p><p>Where $G$ is the generator, $D$ is the discriminator. The image $x$ has a distribution $p_{data}$, and $p_{z}$ is the latent noise distribution from where we sample to generate the images; for this notebook we will use a Gaussian distribution. The only difference with respect the original minmax game proposed for the GAN, is that the inputs $x$ and $z$ are conditioned by a latent variable $y$, that tells information about a particular mode.</p><pre><code class="python">cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+</code></pre><h3 id="for-discriminator">For discriminator</h3><p>The discriminator want to maximize its correct answers, and thus it whants to maximize the expected value of real images detected $ \mathbb{E}<em>{x ~ p</em>{data}(x)} [logD(x|y)]$, that is, the result of $D(x|y)$ always yields 1 (it's a real painting). And maximize the number of times it finds an image generated $\mathbb{E}<em>{x ~ p</em>{z}(z)}[log(1 - D(G(z|y)))$, that is, the result of $D(G(z|y))$ always yields 0 (it's not real).</p><pre><code class="python">def discriminator_loss_classic(real_output, fake_output):
+    # pérdida de los verdaeros (1 vs y_hat )
+    real_loss = cross_entropy(tf.ones_like(real_output), real_output)
+    # pérdida de los sintéticos (0 vs y_hat )
+    fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
+    # suma de los dos tipos de errores
+    total_loss = real_loss + fake_loss
+    return total_loss
 
-    def __getitem__(self, index):
-        input_sequence = self.data[index][0]
-        output_sequence = self.data[index][1]
+def discriminator_loss(real_output, fake_output):
+    # pérdida de los verdaeros (1 vs y_hat )   + pérdida de los sintéticos (0 vs y_hat 
+    total_loss = -tf.reduce_mean(tf.keras.backend.log(real_output) + tf.keras.backend.log(1.- fake_output))
+    return total_loss
+</code></pre><h3 id="for-generator">For generator</h3><p>the generator whants to fool the discriminator, and since it does not have direct control on the results with real images, it can insted improve the quality of the fake image and reduce $\mathbb{E}<em>{x ~ p</em>{z}(z)}[log(1 - D(G(z|y)))$, that is, making $D(G(z|y))$ always 1 (the fake image is real for the discriminator)</p><pre><code class="python">def generator_loss_classic(fake_output):
+    return cross_entropy(tf.ones_like(fake_output), fake_output)
 
-        # Since we add a token at the beggining of all the input sequences
-        length = torch.LongTensor([len(input_sequence)]) + 1
-        return self.add_padding_sos(input_sequence), length,\
-            self.add_padding_sos(output_sequence, True),\
-            self.add_padding(output_sequence)
-</code></pre><p>The collate_fn will sort the sequences by length as required by pack_padded_sequence</p><pre><code class="python">def collate_fn(batch):
-    batch_len = len(batch)
-    max_sequence_length = batch[0][0].shape[-1]
+def generator_loss(real_output,fake_output):
+    #  pérdida de los sintéticos (0 vs y_hat 
+    total_loss = -tf.reduce_mean(tf.keras.backend.log(fake_output))
+    return total_loss
+</code></pre><h2 id="optimizers">Optimizers</h2><pre><code class="python">generator_optimizer     = tf.keras.optimizers.Adam(1e-5)
+discriminator_optimizer = tf.keras.optimizers.Adam(1e-5)
+</code></pre><h2 id="training">Training</h2><ol><li>Obtain a batch of real images $X$ with their respective labels $y_X$.</li><li>Obtain a batch of latent variables whit a uniformly sampled labels $y_Z$.</li><li>Obtain the fake images from the latent and conditional variables.</li><li>Obtain the results for real and fake images from the discriminator.</li><li>Calculate the loss for the discriminator and generator.</li><li>Calculate the gradients.</li><li>Make a backpropagation step and update the weights for both models.</li></ol><pre><code class="python">#El decorador `tf.function` indica que la función se "compila" para que pueda incluirse en un gráfo de calculo.
 
-    no_sort_input_seq, no_sort_lengths, no_sort_sampling_seq,\
-        no_sort_target_seq = zip(*batch)
+@tf.function
+def train_step(images, labels):
+    '''
 
-    sorted_length_indices = np.array(no_sort_lengths).argsort()[::-1].tolist()
+    Implementa un paso de entrenamiento para la GAN
 
-    input_sequences    = torch.zeros([batch_len, max_sequence_length]).long()
-    sampling_sequences = torch.zeros([batch_len, max_sequence_length]).long()
-    target_sequences   = torch.zeros([batch_len, max_sequence_length]).long()
-    lengths            = torch.zeros([batch_len]).long()
-    for i_batch, sorted_in in enumerate(sorted_length_indices):
-        input_sequences[i_batch]    = no_sort_input_seq[sorted_in]
-        lengths[i_batch] = length   = no_sort_lengths[sorted_in]
-        sampling_sequences[i_batch] = no_sort_sampling_seq[sorted_in]
-        target_sequences[i_batch]   = no_sort_target_seq[sorted_in]
+    Recibe como parámetros un semi-lote de imágenes reales
+    '''
 
-    return input_sequences, lengths, sampling_sequences, target_sequences
-</code></pre><pre><code class="python"># Example for validation
-tmp_set = OpenSubtitlesSpanish(21, pairs)
-small_batch_size = 6
-train_loader = DataLoader(
-    tmp_set,
-    batch_size=small_batch_size,
-    shuffle=True,
-    num_workers=1,
-    drop_last=True,
-    collate_fn=collate_fn
-)
-batch_generator = iter(train_loader)
-batches = next(batch_generator)
-input_variable, lengths, sampling_variable, target_variable = batches
+    # variables latentes (ruido Gaussiano), tantas como imagenes reales
+    z = tf.random.normal([images.shape[0], z_dim])
 
-print("input_variable:\n", input_variable)
-print("lengths:", lengths)
-print("sampling_variable:\n", sampling_variable)
-print("target_output:\n", target_variable)
-print("Length dataset:\n", len(tmp_set))
-</code></pre><pre><code>input_variable:
- tensor([[   1,   39, 2814,   11, 4420,   27, 4533, 2453,  318,   11,   15, 4604,
-            7,    2,    0,    0,    0,    0,    0,    0,    0],
-        [   1,  209,  118,    3,  721, 6825,   47, 1404,    7,    2,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [   1,   31,   32,  782,  209,   87, 4748,  531,   37,    2,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [   1,  193,   12, 1586,   11,    3,    3,    7,    2,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [   1,  106,   82, 2277,   75,    2,    0,    0,    0,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [   1,   35,  387, 7358,    7,    2,    0,    0,    0,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0]])
-lengths: tensor([14, 10, 10,  9,  6,  6])
-sampling_variable:
- tensor([[   1,   47, 3646,    7,    0,    0,    0,    0,    0,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [   1,  507, 6900,  205, 4113,   11,   82, 4948,   11, 6901,  721,  299,
-         3286,    7,    0,    0,    0,    0,    0,    0,    0],
-        [   1,   31,  241,   38, 6807,    5, 1583,   46,   37,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [   1,  569, 4834,    7,    0,    0,    0,    0,    0,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [   1, 8001, 3950, 1401,   35,  136, 5071,   75,    0,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [   1,   73,  929,  223,   24,  290,  864, 1308,   60,   75,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0]])
-target_output:
- tensor([[  47, 3646,    7,    2,    0,    0,    0,    0,    0,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [ 507, 6900,  205, 4113,   11,   82, 4948,   11, 6901,  721,  299, 3286,
-            7,    2,    0,    0,    0,    0,    0,    0,    0],
-        [  31,  241,   38, 6807,    5, 1583,   46,   37,    2,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [ 569, 4834,    7,    2,    0,    0,    0,    0,    0,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [8001, 3950, 1401,   35,  136, 5071,   75,    2,    0,    0,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0],
-        [  73,  929,  223,   24,  290,  864, 1308,   60,   75,    2,    0,    0,
-            0,    0,    0,    0,    0,    0,    0,    0,    0]])
-Length dataset:
- 44169
-</code></pre><h2 id="train-the-model">Train the model</h2><p>Next, we will set the hyperparameters of our model. We use a hidden unit size of 500 and a fully connected layer of 500 for the attention model. The attention model used is the Bahdanau soft attention. The decoder used is the Loung decoder. Also, we use clip by norm with max value of 50, in order to not have exploding gradients. Finally, below are the rest of the hyper parameters concerning the optimizer.</p><pre><code class="python">args = Namespace(model_state_file="chat_bot.pth",
-                 vectorizer_file="vectorizer.json",
-                 save_dir="model_storage/chat_bot",
-                 reload_from_files=False,
-                 expand_filepaths_to_save_dir=True,
-                 cuda=True,
-                 seed=1337,
-                 learning_rate=4e-4,
-                 batch_size=254,
-                 num_epochs=170,
-                 early_stopping_criteria=5,
-                 source_embedding_size=500,
-                 target_embedding_size=500,
-                 encoding_size=500,
-                 catch_keyboard_interrupt=True,
-                 attention=BahdanauAttention,
-                 attention_init_args=[500, 1000, 1000],
-                 decoder=NMTDecoder,
-                 max_sequence_len=21,
-                 clip=50)
+    # Generamos las etiquetas de forma aleatoria correspondientes con cada una
+    # de las variables latentes.
+    y = tf.random.uniform(shape=[images.shape[0], ], minval=0, maxval=10, dtype=tf.int64)
 
-# handle dirs
-handle_dirs(args.save_dir)
+    # Los siguientes pasos registaran (en "TAPE") para efectos de calcular gradientes
+    # son dos "Tapes" para registrar los calculos de cada modelo
+    with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
 
-args = expand_filepaths_to_save_dir(args)
+        # genera el semi-lote de datos sintéticos
+        generated_images = generator([z, y], training=True)
 
-train_set = OpenSubtitlesSpanish(args.max_sequence_len, pairs)
-train_loader = DataLoader(
-    train_set,
-    batch_size=args.batch_size,
-    shuffle=True,
-    num_workers=8,
-    drop_last=True,
-    collate_fn=collate_fn
-)
+        # calcula la predicción para datos verdaderos y falsos
+        real_output = discriminator([images, labels], training=True)
+        fake_output = discriminator([generated_images, y], training=True)
 
-chat_bot_model =\
-     NMTModel(source_vocab_size=voc.num_words,
-              source_embedding_size=args.source_embedding_size,
-              target_vocab_size=voc.num_words,
-              target_embedding_size=args.target_embedding_size, 
-              encoding_size=args.encoding_size,
-              target_bos_index=SOS_token,
-              attention=args.attention,
-              attention_init_args=args.attention_init_args,
-              decoder=args.decoder)
-</code></pre><pre><code>Expanded filepaths: 
-	model_storage/chat_bot/vectorizer.json
-	model_storage/chat_bot/chat_bot.pth
-</code></pre><p>Note: The function here present an error, since id only saves the model when 5 epochs has passed, and do not perform tbe intended task of saving the model when improved.</p><pre><code class="python">def update_train_state(args, model, train_state, epoch):
-    """Handle the training state updates.
-    Components:
-     - Model Checkpoint: Model is saved if the model is better
+        # calcula las pérdidas del Discriminador y del Generador
+        disc_loss = discriminator_loss(real_output, fake_output)
+        gen_loss  = generator_loss(real_output, fake_output)
 
-    Args
-      args: main arguments
-      model: model to train
-      epoch: the current epoch index.
-    :returns:
-        a new train_state
+    # Para cada modelo, calcula el gradiente de su función de costo respecto a sus pesos entrenables, 
+    # haciendo retropropagación sobre los calculos realizados
+    gradients_of_generator     = gen_tape.gradient(gen_loss, generator.trainable_variables)
+    gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+
+    # Hace el paso de actualizacion de los pesos
+    generator_optimizer.apply_gradients(zip(gradients_of_generator, generator.trainable_variables))
+    discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
+    
+    return gen_loss, disc_loss
+</code></pre><p>For each 5 epoch, we will visualize a set of images to see the evolution of the generator.</p><pre><code class="python">from PIL import Image
+import imageio
+import glob
+plt.rcParams['figure.dpi'] = 200
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - 
+# Crea una collage de imágenes con el Generador y la guarda
+# - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+image_grid_rows          = 10
+image_grid_columns       = 4
+
+num_examples_to_generate = image_grid_rows * image_grid_columns
+seed           = tf.random.normal([num_examples_to_generate, z_dim])
+lst            = range(0,10)
+lst            = list(itertools.chain.from_iterable(itertools.repeat(x, 4) for x in lst))
+labels_seed    = tf.convert_to_tensor(lst)
+
+def generate_and_save_images(model, epoch, test_input, pathdir=path_results):
     """
-
-    # Save one model at least
-    if train_state['epoch_index'] == 0:
-        torch.save(model.state_dict(), train_state['model_filename'])
-        train_state['stop_early'] = False
-
-    # Save model if performance improved
-    elif train_state['epoch_index'] &gt;= 1 and epoch % 5 == 0:
-        torch.save(model.state_dict(), train_state['model_filename'])
-
-    return train_state
-</code></pre><pre><code class="python">def train(args, dataloader, model):
-    # Check CUDA
-    if not torch.cuda.is_available():
-        args.cuda = False
-
-    args.device = torch.device("cuda" if args.cuda else "cpu")
-
-    print("Using CUDA: {}".format(args.cuda))
-
-    # Set seed for reproducibility
-    set_seed_everywhere(args.seed, args.cuda)
-
-    if args.reload_from_files and os.path.exists(args.model_state_file):
-        model.load_state_dict(torch.load(args.model_state_file))
-        print("Reloaded model")
-    else:
-        print("New model")
-
-    model = model.to(args.device)
-
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-
-    mask_index = PAD_token
-    train_state = make_train_state(args)
-
-    try:
-        for epoch_index in range(args.num_epochs):
-            sample_probability = (20 + epoch_index) / args.num_epochs
-
-            train_state['epoch_index'] = epoch_index
-
-            # Iterate over training dataset
-
-
-            running_loss = 0.0
-            model.train()
-
-            for batch_index, batch in tqdm(enumerate(dataloader)):
-                # the training routine is these 6 steps:
-                input_variable, lengths, sampling_variable, target_variable = batch
-
-                # --------------------------------------
-                # step 1. zero the gradients
-                optimizer.zero_grad()
-
-                # step 2. compute the output
-                y_pred = model(input_variable.to(device),
-                               lengths.to(device),
-                               sampling_variable.to(device),
-                               sample_probability=sample_probability)
-
-                # step 3. compute the loss
-                loss = sequence_loss(y_pred, target_variable.to(device), mask_index)
-
-                # step 4. use loss to produce gradients
-                loss.backward()
-
-                # step 5. clip the gradients by norm
-                _ = torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-                
-                # step 6. use optimizer to take gradient step
-                optimizer.step()
-
-                # -----------------------------------------
-                # compute the running loss and running accuracy
-                running_loss += (loss.item() - running_loss) / (batch_index + 1)
-
-
-            train_state['train_loss'].append(running_loss)
-
-            print("Epoch {}: Running loss: {}".format(epoch_index + 1, running_loss))
-
-            train_state = update_train_state(args=args, model=model,
-                                             train_state=train_state, epoch = epoch_index)
-    except KeyboardInterrupt:
-        print("Exiting loop")
-
-    return model, train_state
-
-</code></pre><pre><code class="python">print(len(train_set))
-#chat_bot_model, chat_bot_state = train(args, train_loader, chat_bot_model)
-</code></pre><pre><code>44169
-Using CUDA: True
-New model
-
-
-173it [00:29,  5.80it/s]
-
-
-Epoch 1: Running loss: 4.840963330572053
-
-
-173it [00:30,  5.76it/s]
-
-Epoch 2: Running loss: 3.7431584562180347
-
-
-
-173it [00:30,  5.76it/s]
-
-Epoch 3: Running loss: 2.7530420115917402
-
-
-
-173it [00:30,  5.73it/s]
-
-Epoch 4: Running loss: 2.0536236949049673
-
-
-
-173it [00:30,  5.71it/s]
-
-Epoch 5: Running loss: 1.5537139707907086
-
-
-
-173it [00:30,  5.71it/s]
-
-
-Epoch 6: Running loss: 1.1789935954733388
-
-
-173it [00:30,  5.70it/s]
-
-Epoch 7: Running loss: 0.9493062385933936
-
-
-
-173it [00:30,  5.70it/s]
-
-Epoch 8: Running loss: 0.7249696456283505
-
-
-
-173it [00:30,  5.69it/s]
-
-Epoch 9: Running loss: 0.6338868983563658
-
-
-
-173it [00:30,  5.69it/s]
-
-Epoch 10: Running loss: 0.5433931946754453
-
-
-
-173it [00:30,  5.70it/s]
-
-
-Epoch 11: Running loss: 0.4599869723264883
-
-
-173it [00:30,  5.68it/s]
-
-Epoch 12: Running loss: 0.4226332878790837
-
-
-
-173it [00:30,  5.69it/s]
-
-Epoch 13: Running loss: 0.36522590847029174
-
-
-
-173it [00:30,  5.67it/s]
-
-Epoch 14: Running loss: 0.3301871324205672
-
-
-
-173it [00:30,  5.68it/s]
-
-Epoch 15: Running loss: 0.3150579750193339
-
-
-
-173it [00:30,  5.67it/s]
-
-
-Epoch 16: Running loss: 0.30597860000037036
-
-
-173it [00:30,  5.67it/s]
-
-Epoch 17: Running loss: 0.3074520241490678
-
-
-
-173it [00:30,  5.66it/s]
-
-Epoch 18: Running loss: 0.28996355314819805
-
-
-
-173it [00:30,  5.64it/s]
-
-Epoch 19: Running loss: 0.26911808533131015
-
-
-
-173it [00:30,  5.65it/s]
-
-Epoch 20: Running loss: 0.26569511246129957
-
-
-
-173it [00:30,  5.64it/s]
-
-
-Epoch 21: Running loss: 0.23868942295195736
-
-
-173it [00:30,  5.65it/s]
-
-Epoch 22: Running loss: 0.24293592219063312
-
-
-
-173it [00:30,  5.64it/s]
-
-Epoch 23: Running loss: 0.23138521973452816
-
-
-
-173it [00:30,  5.64it/s]
-
-Epoch 24: Running loss: 0.2419577727600329
-
-
-
-173it [00:30,  5.64it/s]
-
-Epoch 25: Running loss: 0.236568314405535
-
-
-
-173it [00:30,  5.63it/s]
-
-
-Epoch 26: Running loss: 0.24141890249844927
-
-
-173it [00:30,  5.63it/s]
-
-Epoch 27: Running loss: 0.21832985430955887
-
-
-
-173it [00:30,  5.64it/s]
-
-Epoch 28: Running loss: 0.23853645236850468
-
-
-
-173it [00:30,  5.63it/s]
-
-Epoch 29: Running loss: 0.22073688827498109
-
-
-
-173it [00:30,  5.63it/s]
-
-Epoch 30: Running loss: 0.24312746313782788
-
-
-
-173it [00:30,  5.62it/s]
-
-
-Epoch 31: Running loss: 0.22836983238341488
-
-
-173it [00:30,  5.63it/s]
-
-Epoch 32: Running loss: 0.2155133754531772
-
-
-
-173it [00:30,  5.62it/s]
-
-Epoch 33: Running loss: 0.21022148038438304
-
-
-
-173it [00:30,  5.62it/s]
-
-Epoch 34: Running loss: 0.22792773512918826
-
-
-
-173it [00:30,  5.61it/s]
-
-Epoch 35: Running loss: 0.22619032041530387
-
-
-
-173it [00:30,  5.61it/s]
-
-
-Epoch 36: Running loss: 0.23076529641544197
-
-
-173it [00:30,  5.61it/s]
-
-Epoch 37: Running loss: 0.22437078837369911
-
-
-
-173it [00:30,  5.62it/s]
-
-Epoch 38: Running loss: 0.22346804855186814
-
-
-
-173it [00:30,  5.60it/s]
-
-Epoch 39: Running loss: 0.22524883395674603
-
-
-
-173it [00:30,  5.61it/s]
-
-Epoch 40: Running loss: 0.23443657900556664
-
-
-
-173it [00:30,  5.61it/s]
-
-
-Epoch 41: Running loss: 0.21733863022975144
-
-
-173it [00:30,  5.59it/s]
-
-Epoch 42: Running loss: 0.23370349829252046
-
-
-
-173it [00:30,  5.60it/s]
-
-Epoch 43: Running loss: 0.23226657371989565
-
-
-
-173it [00:30,  5.60it/s]
-
-Epoch 44: Running loss: 0.23759147266432046
-
-
-
-173it [00:30,  5.59it/s]
-
-Epoch 45: Running loss: 0.21758928894996638
-
-
-
-173it [00:30,  5.59it/s]
-
-
-Epoch 46: Running loss: 0.2240378878192405
-
-
-173it [00:30,  5.58it/s]
-
-Epoch 47: Running loss: 0.225021654126272
-
-
-
-173it [00:30,  5.59it/s]
-
-Epoch 48: Running loss: 0.23357872027537735
-
-
-
-173it [00:30,  5.59it/s]
-
-Epoch 49: Running loss: 0.2372818894555114
-
-
-
-173it [00:30,  5.58it/s]
-
-Epoch 50: Running loss: 0.24644370514877942
-
-
-
-173it [00:31,  5.58it/s]
-
-
-Epoch 51: Running loss: 0.23111108996275526
-
-
-173it [00:31,  5.57it/s]
-
-Epoch 52: Running loss: 0.24043498235630856
-
-
-
-173it [00:31,  5.57it/s]
-
-Epoch 53: Running loss: 0.23420886686771605
-
-
-
-173it [00:31,  5.57it/s]
-
-Epoch 54: Running loss: 0.2409243690915879
-
-
-
-173it [00:31,  5.57it/s]
-
-Epoch 55: Running loss: 0.23507072531074455
-
-
-
-173it [00:31,  5.56it/s]
-
-
-Epoch 56: Running loss: 0.22403380903549963
-
-
-173it [00:31,  5.55it/s]
-
-Epoch 57: Running loss: 0.2336393201540661
-
-
-
-173it [00:31,  5.56it/s]
-
-Epoch 58: Running loss: 0.23644927187117537
-
-
-
-173it [00:31,  5.57it/s]
-
-Epoch 59: Running loss: 0.23189787252273175
-
-
-
-173it [00:31,  5.56it/s]
-
-Epoch 60: Running loss: 0.23154818503498356
-
-
-
-173it [00:31,  5.56it/s]
-
-
-Epoch 61: Running loss: 0.2308199395764769
-
-
-173it [00:31,  5.55it/s]
-
-Epoch 62: Running loss: 0.24116949233188795
-
-
-
-173it [00:31,  5.55it/s]
-
-Epoch 63: Running loss: 0.2550903482071926
-
-
-
-173it [00:31,  5.55it/s]
-
-Epoch 64: Running loss: 0.24746342494308624
-
-
-
-173it [00:31,  5.54it/s]
-
-Epoch 65: Running loss: 0.255607238265476
-
-
-
-173it [00:31,  5.56it/s]
-
-
-Epoch 66: Running loss: 0.23634568601846706
-
-
-173it [00:31,  5.54it/s]
-
-Epoch 67: Running loss: 0.2439347147683188
-
-
-
-173it [00:31,  5.54it/s]
-
-Epoch 68: Running loss: 0.23424983692134732
-
-
-
-173it [00:31,  5.53it/s]
-
-Epoch 69: Running loss: 0.254712729526393
-
-
-
-173it [00:31,  5.53it/s]
-
-Epoch 70: Running loss: 0.24645285898378125
-
-
-
-173it [00:31,  5.55it/s]
-
-
-Epoch 71: Running loss: 0.24663094797230875
-
-
-173it [00:31,  5.53it/s]
-
-Epoch 72: Running loss: 0.2418310158170027
-
-
-
-173it [00:31,  5.53it/s]
-
-Epoch 73: Running loss: 0.2465563955248435
-
-
-
-173it [00:31,  5.53it/s]
-
-Epoch 74: Running loss: 0.25686759996965447
-
-
-
-173it [00:31,  5.53it/s]
-
-Epoch 75: Running loss: 0.2562192251658166
-
-
-
-173it [00:31,  5.52it/s]
-
-
-Epoch 76: Running loss: 0.24999526552209966
-
-
-173it [00:31,  5.52it/s]
-
-Epoch 77: Running loss: 0.269696467916745
-
-
-
-173it [00:31,  5.51it/s]
-
-Epoch 78: Running loss: 0.2605035507007142
-
-
-
-173it [00:31,  5.50it/s]
-
-Epoch 79: Running loss: 0.2587751106633614
-
-
-
-173it [00:31,  5.51it/s]
-
-Epoch 80: Running loss: 0.25580924456519205
-
-
-
-173it [00:31,  5.50it/s]
-
-
-Epoch 81: Running loss: 0.27159282194741213
-
-
-173it [00:31,  5.51it/s]
-
-Epoch 82: Running loss: 0.26557322673370404
-
-
-
-173it [00:31,  5.51it/s]
-
-Epoch 83: Running loss: 0.2857182302399178
-
-
-
-173it [00:31,  5.50it/s]
-
-Epoch 84: Running loss: 0.2671153078964681
-
-
-
-173it [00:31,  5.50it/s]
-
-Epoch 85: Running loss: 0.269733636666929
-
-
-
-173it [00:31,  5.50it/s]
-
-
-Epoch 86: Running loss: 0.27065549239602393
-
-
-173it [00:31,  5.49it/s]
-
-Epoch 87: Running loss: 0.2638684012900197
-
-
-
-173it [00:31,  5.48it/s]
-
-Epoch 88: Running loss: 0.2922541013342797
-
-
-
-173it [00:31,  5.49it/s]
-
-Epoch 89: Running loss: 0.2772755387718278
-
-
-
-173it [00:31,  5.49it/s]
-
-Epoch 90: Running loss: 0.27864698346467376
-
-
-
-173it [00:31,  5.49it/s]
-
-
-Epoch 91: Running loss: 0.27461170133827745
-
-
-173it [00:31,  5.49it/s]
-
-Epoch 92: Running loss: 0.2834274292508989
-
-
-
-173it [00:31,  5.48it/s]
-
-Epoch 93: Running loss: 0.2899766802960048
-
-
-
-173it [00:31,  5.48it/s]
-
-Epoch 94: Running loss: 0.2903737769908989
-
-
-
-173it [00:31,  5.49it/s]
-
-Epoch 95: Running loss: 0.2764557339035707
-
-
-
-173it [00:31,  5.48it/s]
-
-
-Epoch 96: Running loss: 0.3065410046649805
-
-
-173it [00:31,  5.47it/s]
-
-Epoch 97: Running loss: 0.287089997719478
-
-
-
-173it [00:31,  5.49it/s]
-
-Epoch 98: Running loss: 0.2917500490139675
-
-
-
-173it [00:31,  5.47it/s]
-
-Epoch 99: Running loss: 0.30581837048420324
-
-
-
-173it [00:31,  5.47it/s]
-
-Epoch 100: Running loss: 0.3017207707972884
-
-
-
-173it [00:31,  5.48it/s]
-
-
-Epoch 101: Running loss: 0.3034874715901523
-
-
-173it [00:31,  5.47it/s]
-
-Epoch 102: Running loss: 0.29940169748198786
-
-
-
-173it [00:31,  5.49it/s]
-
-Epoch 103: Running loss: 0.29909792796552515
-
-
-
-173it [00:31,  5.45it/s]
-
-Epoch 104: Running loss: 0.30227563633567334
-
-
-
-173it [00:31,  5.46it/s]
-
-Epoch 105: Running loss: 0.3097429003329635
-
-
-
-173it [00:31,  5.46it/s]
-
-
-Epoch 106: Running loss: 0.3183233010975611
-
-
-173it [00:31,  5.46it/s]
-
-Epoch 107: Running loss: 0.3065781124754449
-
-
-
-173it [00:31,  5.45it/s]
-
-Epoch 108: Running loss: 0.2980262926117532
-
-
-
-173it [00:31,  5.45it/s]
-
-Epoch 109: Running loss: 0.3116443409568312
-
-
-
-173it [00:31,  5.45it/s]
-
-Epoch 110: Running loss: 0.3227524877542012
-
-
-
-173it [00:31,  5.45it/s]
-
-
-Epoch 111: Running loss: 0.31587304450528464
-
-
-173it [00:31,  5.45it/s]
-
-Epoch 112: Running loss: 0.32064717956361044
-
-
-
-173it [00:31,  5.45it/s]
-
-Epoch 113: Running loss: 0.3138875864833766
-
-
-
-173it [00:31,  5.44it/s]
-
-Epoch 114: Running loss: 0.31918885399495944
-
-
-
-173it [00:31,  5.44it/s]
-
-Epoch 115: Running loss: 0.3175609745731245
-
-
-
-173it [00:31,  5.45it/s]
-
-
-Epoch 116: Running loss: 0.30850485888864254
-
-
-173it [00:31,  5.44it/s]
-
-Epoch 117: Running loss: 0.31758583668683993
-
-
-
-173it [00:31,  5.44it/s]
-
-Epoch 118: Running loss: 0.3234375051163523
-
-
-
-173it [00:31,  5.44it/s]
-
-Epoch 119: Running loss: 0.3194704461476706
-
-
-
-173it [00:31,  5.43it/s]
-
-Epoch 120: Running loss: 0.30925199156896244
-
-
-
-173it [00:31,  5.42it/s]
-
-
-Epoch 121: Running loss: 0.32386012556235905
-
-
-173it [00:31,  5.43it/s]
-
-Epoch 122: Running loss: 0.33083911179807146
-
-
-
-173it [00:31,  5.42it/s]
-
-Epoch 123: Running loss: 0.33203340954863253
-
-
-
-173it [00:31,  5.43it/s]
-
-Epoch 124: Running loss: 0.32846294507125906
-
-
-
-173it [00:31,  5.41it/s]
-
-Epoch 125: Running loss: 0.3307752347405937
-
-
-
-173it [00:31,  5.43it/s]
-
-
-Epoch 126: Running loss: 0.33824293134529454
-
-
-173it [00:31,  5.42it/s]
-
-Epoch 127: Running loss: 0.3359318928566972
-
-
-
-173it [00:32,  5.29it/s]
-
-Epoch 128: Running loss: 0.33835848020335846
-
-
-
-173it [00:32,  5.30it/s]
-
-Epoch 129: Running loss: 0.34098250203566705
-
-
-
-173it [00:32,  5.37it/s]
-
-Epoch 130: Running loss: 0.3442683142389175
-
-
-
-173it [00:32,  5.37it/s]
-
-
-Epoch 131: Running loss: 0.3463604275374052
-
-
-173it [00:32,  5.40it/s]
-
-Epoch 132: Running loss: 0.34767594304732524
-
-
-
-173it [00:32,  5.40it/s]
-
-Epoch 133: Running loss: 0.3396985149280184
-
-
-
-173it [00:32,  5.39it/s]
-
-Epoch 134: Running loss: 0.34718317430832474
-
-
-
-173it [00:32,  5.40it/s]
-
-Epoch 135: Running loss: 0.34855380456227103
-
-
-
-173it [00:32,  5.39it/s]
-
-
-Epoch 136: Running loss: 0.34891339809219274
-
-
-173it [00:32,  5.40it/s]
-
-Epoch 137: Running loss: 0.3462149476729377
-
-
-
-173it [00:32,  5.39it/s]
-
-Epoch 138: Running loss: 0.34590971151183814
-
-
-
-173it [00:32,  5.38it/s]
-
-Epoch 139: Running loss: 0.35315719298544623
-
-
-
-173it [00:32,  5.31it/s]
-
-Epoch 140: Running loss: 0.3488762359743173
-
-
-
-173it [00:32,  5.40it/s]
-
-
-Epoch 141: Running loss: 0.34942269351096505
-
-
-173it [00:32,  5.39it/s]
-
-Epoch 142: Running loss: 0.35466083806718707
-
-
-
-116it [00:21,  5.37it/s]
-
-Exiting loop
-</code></pre><pre><code class="python">chat_bot_model.load_state_dict(torch.load(args.model_state_file))
-</code></pre><pre><code>&lt;All keys matched successfully&gt;
-</code></pre><pre><code class="python">plt.plot(range(chat_bot_state['epoch_index']), chat_bot_state['train_loss'])
-</code></pre><pre><code>[&lt;matplotlib.lines.Line2D at 0x7f2b07d776d0&gt;]
-</code></pre><p><img src="/img/javier_antonio_gonzalez_trejo_chatbot_25_1.png" alt="png" /></p><p>Here, we see the epoch vs loss graph. We can clearly see that reaching the lowest loss value early as 30 epochs.</p><h2 id="testing-the-model">Testing the model</h2><p>Now, we will chat with the chat bot, to get a feel on what the model actually learned, since we do not have a metric for hard proofs in its performance.</p><pre><code class="python">def process_punct(s):
-    s = s.strip().lower().decode()
-    s = re.sub(r"\.000",r" mil", s)
-    s = re.sub(r"^-",       r"&lt;GUION_INIC&gt;", s)
-    s = re.sub(r"-{2}",     r"&lt;GUION_DOBL&gt;", s)
-    s = re.sub(r"\.{3}",    r"&lt;TRIP_DOT&gt;", s)
-    s = re.sub(r"{y:bi}",   r"&lt;SPECIAL_1&gt;", s)
-    s = re.sub(r"(\w)-(\w)",r"\1&lt;GUION_INTER&gt;\2", s)
-    s = re.sub(r"([\):!?])",r" \1", s)      #separa puntuacion con espacio antes
-    s = re.sub(r"([\(¡¿])", r"\1 ", s)      #separa puntuacion con espacio despues
-    s = re.sub(r"([\"-,¿\.}])", r" \1 ", s) #espacio antes y despues
-
-def indexesFromSentence(spl_snt, voc):
-    idxs = []
-    for word in spl_snt:
-        try:
-            idxs += [voc.word2index[word]]
-        except:
-            idxs += [UNK_token] #word2index["UNK"]=UNK_token
-    return [SOS_token] + idxs + [EOS_token]
-
-def custom_capitalize(s):
-    for i, c in enumerate(s):
-        if c.isalpha():
-            break
-    return s[:i] + s[i:].capitalize()
-
-def reformatString(l):
-    s = l.strip().lower()
-#     s = re.sub(r"&lt;guion_inic&gt;",r"", s)
-    s = re.sub(r"\s+([.!?])", r"\1", s)
-    s = re.sub(r"([¡¿])\s+", r"\1", s)
-    s = re.sub(r"\s+", r" ", s)
-    return custom_capitalize(s).strip()
-</code></pre><p>The model returns 20 vectors with the same size as the vocabulary, we simply obtain the index with the highest value to obtain the predicted word.
-NOTE: A bug was found in all attention models, where when squeezing the query vector, it might remove the batch dimension, render the model not usable.
-Thus, we implemented the work around of passing at least to sentences to the model.</p><pre><code class="python">def evaluate(model, voc, sentence, max_length=21):
-    ### Format input sentence as a batch
-    # words -&gt; indexes
-    chat_bot_model = model.to(device)
-    sentence = "que día es hoy?".split()
-    indexes_batch = [indexesFromSentence(sentence, voc)]
-    # Create lengths tensor
-    lengths = torch.LongTensor([len(indexes) for indexes in indexes_batch])
-    # Transpose dimensions of batch to match models' expectations
-    input_batch = torch.LongTensor(indexes_batch).to(device).repeat(2, 1)
-    lengths = lengths.to(device).repeat(2)
-    # Decode sentence with searcher
-    tokens = chat_bot_model(input_batch, lengths, target_sequence = None)
-    tokens = tokens[0]
-    decoded_words = [voc.index2word[int(torch.argmax(token).detach().cpu())] 
-                 for token in tokens.squeeze()]
-    return decoded_words
-
-
-def evaluateInput(model, voc):
-    input_sentence = ''
-    while(1):
-        try:
-            # Get input sentence
-            input_sentence = input('&gt; ')
-            # Check if it is quit case
-            if input_sentence == 'q' or input_sentence == 'quit': break
-            # Normalize sentence
-#             input_sentence = "-"+input_sentence #para que siga el formato de guiones de una conversacion
-            input_sentence = process_punct(input_sentence.encode())
-            # Evaluate sentence
-            output_words = evaluate(model, voc, input_sentence)
-            # Format and print response sentence
-            output_words[:] = [x for x in output_words if not (x == 'EOS' or x == 'PAD')]
-            raw_ans = ' '.join(output_words)
-            ans = reformatString(raw_ans)
-            print('Bot:',ans)
-
-        except KeyError:
-            print("Error: Encountered unknown word.")
-</code></pre><pre><code class="python">evaluateInput(chat_bot_model, voc)
-</code></pre><pre><code>&gt; hola
-Bot: Leonard cabo cubran esposas aislado desapareció farnwell gunga senores i'aigle privado oírlos acantilado reparar miserablemente waidron arroz techo i'aigle magnífico
-&gt; esto es aleatorio, verdad?
-Bot: Canfield sorprendente mostrado junio caminó despedido volved víveres verdaderos propiedad oso postes 9:00 vete dejaste hall candado aplastarán combinación capacidad
-&gt; hahaha, no tiene nada de sentido
-Bot: Tocado derby cámaras: ellsworth castigar museo venecia largues medicamentos acantilado percy trabajé escoger campesina volved artie estrecho hábitos diabilis traicionaron
-
-
-
----------------------------------------------------------------------------
-
-KeyboardInterrupt                         Traceback (most recent call last)
-
-&lt;ipython-input-79-f6b9df2565fe&gt; in &lt;module&gt;
-----&gt; 1 evaluateInput(chat_bot_model, voc)
-
-
-&lt;ipython-input-76-caf62099c1f5&gt; in evaluateInput(model, voc)
-     23         try:
-     24             # Get input sentence
----&gt; 25             input_sentence = input('&gt; ')
-     26             # Check if it is quit case
-     27             if input_sentence == 'q' or input_sentence == 'quit': break
-
-
-~/.pyenv/versions/3.8.1/envs/crowd-counting-thesis/lib/python3.8/site-packages/ipykernel/kernelbase.py in raw_input(self, prompt)
-    858                 "raw_input was called, but this frontend does not support input requests."
-    859             )
---&gt; 860         return self._input_request(str(prompt),
-    861             self._parent_ident,
-    862             self._parent_header,
-
-
-~/.pyenv/versions/3.8.1/envs/crowd-counting-thesis/lib/python3.8/site-packages/ipykernel/kernelbase.py in _input_request(self, prompt, ident, parent, password)
-    902             except KeyboardInterrupt:
-    903                 # re-raise KeyboardInterrupt, to truncate traceback
---&gt; 904                 raise KeyboardInterrupt("Interrupted by user") from None
-    905             except Exception as e:
-    906                 self.log.warning("Invalid Message:", exc_info=True)
-
-
-KeyboardInterrupt: Interrupted by user
-</code></pre><pre><code class="python">This is how the model performs when no training has been implemented. The 20 values of the sequences will be almost always filled with words that do not form any sense to the reader.
-</code></pre><pre><code class="python">We test the actual model.
-</code></pre><pre><code class="python">chat_bot_model.load_state_dict(torch.load(args.model_state_file))
-evaluateInput(chat_bot_model, voc)
-</code></pre><pre><code>&gt; maravilloso
-Bot: Ese misma el el......
-&gt; que es lo que dices?
-Bot: Su respuesta mientras que lo....?.
-&gt; mientras que lo que?
-Bot: Tu misma es más. beber......
-&gt; siempre dices tu misma
-Bot: Tu misma es no no.....
-&gt; muy bien, deacuerdo
-Bot: Su misma siempre no........
-&gt; muy bien de acuerdo
-Bot: Ese ser el mejor. dólares. no....
-&gt; yo soy el mejor
-Bot: Estás misma mientras no.......
-&gt; los dolares estan devaluándose
-Bot: La dólares el no. dólares..!.
-&gt; claro que se estan devalundo, por que eres malo
-Bot: Estás solo el que......
-&gt; yo nunca estoy solo
-Bot: Ese misma el que no.. a...
-&gt; Ese misma el que no
-Bot: Esto misma el mientras.....
-&gt; Esto mismo, querras decir
-Bot: Tu misma es no...... no
-
-
-
----------------------------------------------------------------------------
-
-KeyboardInterrupt                         Traceback (most recent call last)
-
-&lt;ipython-input-80-f8acfad468e4&gt; in &lt;module&gt;
-      1 chat_bot_model.load_state_dict(torch.load(args.model_state_file))
-----&gt; 2 evaluateInput(chat_bot_model, voc)
-
-
-&lt;ipython-input-76-caf62099c1f5&gt; in evaluateInput(model, voc)
-     23         try:
-     24             # Get input sentence
----&gt; 25             input_sentence = input('&gt; ')
-     26             # Check if it is quit case
-     27             if input_sentence == 'q' or input_sentence == 'quit': break
-
-
-~/.pyenv/versions/3.8.1/envs/crowd-counting-thesis/lib/python3.8/site-packages/ipykernel/kernelbase.py in raw_input(self, prompt)
-    858                 "raw_input was called, but this frontend does not support input requests."
-    859             )
---&gt; 860         return self._input_request(str(prompt),
-    861             self._parent_ident,
-    862             self._parent_header,
-
-
-~/.pyenv/versions/3.8.1/envs/crowd-counting-thesis/lib/python3.8/site-packages/ipykernel/kernelbase.py in _input_request(self, prompt, ident, parent, password)
-    902             except KeyboardInterrupt:
-    903                 # re-raise KeyboardInterrupt, to truncate traceback
---&gt; 904                 raise KeyboardInterrupt("Interrupted by user") from None
-    905             except Exception as e:
-    906                 self.log.warning("Invalid Message:", exc_info=True)
-
-
-KeyboardInterrupt: Interrupted by user
-</code></pre><p>We see that it can form readable sentences around the input, high ligthing the response of "La dólares el no. dólares...!". Bit for every thing else, it seems that it overfited to say almost always "Tu misma es". This migth be attributable to leaving the model training far longer that it needed to.</p><p>Next, I use a earlier model, saved around the 50-60 epoch, that yielded a loss less than 0.24,</p><pre><code class="python">chat_bot_model.load_state_dict(torch.load("model_storage/chat_bot/bak.pth"))
-evaluateInput(chat_bot_model, voc)
-</code></pre><pre><code>&gt; hola, como estas?
-Bot: Tienes que. con nosotros por tu......
-&gt; por mi?
-Bot: Puedo que. ¿no????
-&gt; no, la verdad no
-Bot: Puedo viejo. y tu..?..
-&gt; estoy cansado
-Bot: Tienes que. y sin...?.
-&gt; pues no quiero volar
-Bot: Nosotros no puedo??????
-&gt; tampoco puedes volar, lo siento
-Bot: Puedo que puedo con por...
-&gt; Qué día es hoy?
-Bot: Estás ¿está con.......
-&gt; no puede ser
-Bot: Estás que está tu....
-&gt; muy bien, eso es todo amigos
-Bot: Puedo que sea. con y..?..
-&gt; yo no soy con y
-Bot: Dejes que. mañana ¿.??
-&gt; si, mañana tal ves
-Bot: Dejes que puedo. con nosotros...?..
-
-
-
----------------------------------------------------------------------------
-
-KeyboardInterrupt                         Traceback (most recent call last)
-
-&lt;ipython-input-81-b11731833c96&gt; in &lt;module&gt;
-      1 chat_bot_model.load_state_dict(torch.load("model_storage/chat_bot/bak.pth"))
-----&gt; 2 evaluateInput(chat_bot_model, voc)
-
-
-&lt;ipython-input-76-caf62099c1f5&gt; in evaluateInput(model, voc)
-     23         try:
-     24             # Get input sentence
----&gt; 25             input_sentence = input('&gt; ')
-     26             # Check if it is quit case
-     27             if input_sentence == 'q' or input_sentence == 'quit': break
-
-
-~/.pyenv/versions/3.8.1/envs/crowd-counting-thesis/lib/python3.8/site-packages/ipykernel/kernelbase.py in raw_input(self, prompt)
-    858                 "raw_input was called, but this frontend does not support input requests."
-    859             )
---&gt; 860         return self._input_request(str(prompt),
-    861             self._parent_ident,
-    862             self._parent_header,
-
-
-~/.pyenv/versions/3.8.1/envs/crowd-counting-thesis/lib/python3.8/site-packages/ipykernel/kernelbase.py in _input_request(self, prompt, ident, parent, password)
-    902             except KeyboardInterrupt:
-    903                 # re-raise KeyboardInterrupt, to truncate traceback
---&gt; 904                 raise KeyboardInterrupt("Interrupted by user") from None
-    905             except Exception as e:
-    906                 self.log.warning("Invalid Message:", exc_info=True)
-
-
-KeyboardInterrupt: Interrupted by user
-</code></pre><p>Here, the model can actually perform an conversation that is almost human readable, even tough it almost always makes a question. A very curios chat bot indeed.
-I tried to make inquiries about what it answer highligthing the response "Nosotros no puedo", that while it speaks like some one still learning spanish, the meaning "can't we go" can be well understood.</p><h2 id="conclusions">Conclusions</h2><p>The chat bot model using the Bahdanau attention model and a seq2seq architecture was implemented and presented good results despite the self imposed lack of tranining examples due to time constraints.
-Apart from the solution of using more training examples (all the provided at least), the following could be tried to improve the model in future works.</p><ol><li>Train the model in another language and perform transfer learning to spanish.</li><li>It will be interisting to train for larger sequences, while at the same time make comparision of performance with the Loung attention, which is said to performe better for larger sequences.</li><li>Use a bi GRU in the Loung decoder.</li><li>Make use of a stacked GRU for both decoder and encoder.</li><li>Try lematization and see of that improves the chat bot.</li><li>Has as input at least the previus sampled sentence/embedding and see if the chat bot can hold a conversation.</li></ol>
+    Args:
+        test_input: [z, y]
+    """
+    # Se pone entrenable en Falso porque esta en modo inferencia el 
+    predictions = model(test_input, training=False)
+
+    fig, axs = plt.subplots(image_grid_rows,                                 
+                            image_grid_columns,
+                            figsize=(28, 28),
+                            sharey=True,
+                            sharex=True)
+
+    cnt = 0
+    for i in range(image_grid_rows):
+        for j in range(image_grid_columns):
+            axs[i, j].imshow(predictions[cnt, :, :, 0], cmap='gray')            
+            axs[i, j].axis('off')
+            axs[i, j].set_title("Digit: %d" % lst[cnt])
+            cnt += 1
+
+    plt.savefig(pathdir+'image_epch_{:04d}.png'.format(epoch))
+    plt.show()
+# - - - - - - - - - - - - - - - - - - - - - - - - - - 
+# Despliega la imagen correspondiente a una época
+# - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+def display_image(epoch_no, pathdir=path_results):
+    return Image.open(pathdir+'image_epch_{:04d}.png'.format(epoch_no))
+</code></pre><pre><code class="python">from IPython import display
+import time 
+
+def train(dataset, epochs):
+    
+    generator_losses=[] 
+    discriminator_losses=[]
+    for epoch in range(epochs):
+        start = time.time()
+
+        for (image_batch, labels_batch) in dataset:
+            gen_loss, disc_loss = train_step(image_batch, labels_batch)
+
+        # solo registramos los costos en el último lote
+        generator_losses.append(gen_loss)
+        discriminator_losses.append(disc_loss)
+        
+        # Produce imágenes para crear el GIF
+        if (epoch+1)%each_save ==0:
+            display.clear_output(wait=True)  # limpia el buffer
+            generate_and_save_images(generator,
+                                     epoch + 1,
+                                     [seed, labels_seed])
+        
+        print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
+
+    # Genera las las imágens correspondientes a la época final
+    display.clear_output(wait=True)
+    generate_and_save_images(generator,
+                               epochs,
+                               [seed, labels_seed])
+    
+    return np.array(generator_losses), np.array(discriminator_losses)
+</code></pre><h3 id="gan-training">GAN Training</h3><p>And now, we train the GAN.</p><pre><code class="python">#generator_losses, discriminator_losses = train(train_dataset, num_epochs)
+</code></pre><p><img src="conditional_gan_javier_antonio_gonzalez_trejo_files/conditional_gan_javier_antonio_gonzalez_trejo_29_0.png" alt="png" /></p><pre><code class="python">display_image(num_epochs)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_30_0.png" alt="png" /></p><h2 id="save-models">Save models</h2><pre><code class="python">#generator.save_weights('con_dcgan_generator_0_1.h5')
+#discriminator.save_weights('con_dcgan_discriminator_0_1.h5')
+</code></pre><pre><code class="python">generator.load_weights('con_dcgan_generator_0_1.h5')
+discriminator.load_weights('con_dcgan_discriminator_0_1.h5')
+</code></pre><pre><code class="python">plt.figure(figsize=(12,4))
+plt.subplot(131)
+plt.plot(generator_losses, 'r')
+plt.title('$J^G$')
+plt.subplot(132)
+plt.plot(discriminator_losses, 'g')
+plt.title('$J^D$')
+plt.subplot(133)
+plt.plot(generator_losses+discriminator_losses, 'b')
+plt.title('$J^G+J^D$')
+plt.show()
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_34_0.png" alt="png" /></p><h2 id="results-discussion">Results discussion</h2><pre><code class="python">display_image(40)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_36_0.png" alt="png" /></p><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_36_1.png" alt="png" /></p><pre><code class="python">display_image(65)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_37_0.png" alt="png" /></p><pre><code class="python">display_image(155)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_38_0.png" alt="png" /></p><pre><code class="python">display_image(100)
+</code></pre><p><img src="/img/conditional_gan_javier_antonio_gonzalez_trejo_39_0.png" alt="png" /></p><p>Taking a look into the results and the loss graphs, we see that the Conditional GAN starts to learn to produce number images from the latent variables, but at the epoch 40 where this ocurr, we still do not see the conditional variable $y$ take effect, insted the number are produced at random. Example: we see an $8$ in the row of ones.</p><p>Is not upt to when the loss decreeses for the discriminator and incresses for the generator in epoch 65 where we start to see the efect of the conditional variable $y$, where almost all the images correspond to the labels designated.</p><p>We see the GAN reaching it's best performance at around epoch 155, where we see pretty realistic results aligned with their respective assignated label.</p><p>It's clear that the conditional variable "y" has effect on which mode to produce from the latent variable, while also helping in the quality of the number generates, that seems slightly bettern that the ones reported in the original code from where the GAN implementation was taken. An inconvinience is the desync in the times that the GAN learns to learn to generate number and to use the conditional variable. The following steps should be taken in futures works.</p><ol><li>Study The effect on reducing mode collapse by using conditional GAN's</li><li>The dsync could be prevented if the discriminator does not only classify as real or not real, but if the label belongs to the generated image?</li><li>Test the Conditional GAN in the fashion MNIST dataset.</li></ol>
 </div>
 
 <div id="post-tags">
     <b>Tags: </b>
     
-    <a href="/tags-output/nlp/">nlp</a>
-    
     <a href="/tags-output/deep learning/">deep learning</a>
     
-    <a href="/tags-output/gru/">gru</a>
+    <a href="/tags-output/tensorflow/">tensorflow</a>
     
-    <a href="/tags-output/attention/">attention</a>
+    <a href="/tags-output/GAN/">GAN</a>
     
 </div>
 
@@ -1656,7 +556,7 @@ Apart from the solution of using more training examples (all the provided at lea
     <div id="prev-next">
         
         
-        <a class="right" href="/posts-output/2020-12-13-attention/">Analysis of attention mechanism in the task of Machine translation &raquo;</a>
+        <a class="right" href="/posts-output/2020-12-16-chatbot/">Spanish Chat Bot using GRU&#39;s with attention &raquo;</a>
         
     </div>
 </div>
